@@ -146,7 +146,7 @@ class Client(Base):
     email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="نشط")  # نشط/تجريبي/مجمد/منتهي
+    status: Mapped[str] = mapped_column(String(20), default="نشط")  # lifecycle: active / trial / frozen / expired
     tags: Mapped[list | None] = mapped_column(JSON, nullable=True)
     suit_size: Mapped[str | None] = mapped_column(String(4), nullable=True)
     preferred_trainer_id: Mapped[int | None] = mapped_column(ForeignKey("trainers.id"), nullable=True)
@@ -171,7 +171,7 @@ class Subscription(Base):
     sessions_total: Mapped[int] = mapped_column(Integer)
     sessions_remaining: Mapped[int] = mapped_column(Integer)
     price_paid: Mapped[float] = mapped_column(Float)
-    status: Mapped[str] = mapped_column(String(20), default="نشطة")  # نشطة/مجمدة/منتهية/ملغية
+    status: Mapped[str] = mapped_column(String(20), default="نشطة")  # active / frozen / expired / cancelled
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -191,7 +191,7 @@ class Booking(Base):
     subscription_id: Mapped[int | None] = mapped_column(ForeignKey("subscriptions.id"), nullable=True)
     start_time: Mapped[datetime] = mapped_column(DateTime, index=True)
     duration_min: Mapped[int] = mapped_column(Integer, default=20)
-    status: Mapped[str] = mapped_column(String(20), default="مؤكد")  # مؤكد/جاري/مكتمل/لم يحضر/ملغي
+    status: Mapped[str] = mapped_column(String(20), default="مؤكد")  # confirmed / ongoing / completed / no-show / cancelled
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     parq_ack_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -215,14 +215,14 @@ class Lead(Base):
     name: Mapped[str] = mapped_column(String(160))
     phone: Mapped[str] = mapped_column(String(40), index=True)
     email: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    area: Mapped[str | None] = mapped_column(String(120), nullable=True)  # المنطقة/الحي
+    area: Mapped[str | None] = mapped_column(String(120), nullable=True)  # neighborhood / district
     package_id: Mapped[int | None] = mapped_column(ForeignKey("packages.id"), nullable=True)
     package_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    preferred_time: Mapped[str | None] = mapped_column(String(120), nullable=True)  # نص حر: تفضيل العميل
+    preferred_time: Mapped[str | None] = mapped_column(String(120), nullable=True)  # free text — client preference
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(40), default="website")
-    status: Mapped[str] = mapped_column(String(20), default="جديد")  # جديد/تم التواصل/محوّل/مغلق
-    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)  # بعد التحويل
+    status: Mapped[str] = mapped_column(String(20), default="جديد")  # new / contacted / converted / closed
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)  # set after the lead is converted
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

@@ -46,7 +46,7 @@ export default function NewBooking() {
   })
   const set = (p) => setData((d) => ({ ...d, ...p }))
 
-  // Preselect a client coming from "حجز" on the clients page, and skip the picker step.
+  // Preselect a client passed from the clients page (via ?client=) and skip the picker step.
   useEffect(() => {
     if (!preClientId) return
     let active = true

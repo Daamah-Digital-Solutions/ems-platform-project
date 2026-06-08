@@ -42,7 +42,7 @@ export default function App() {
         <Route path="/resources" element={<Resources />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
-        {/* مخفي مؤقتاً — المدفوعات والفواتير (إعادة توجيه للرئيسية) */}
+        {/* Payments & Invoices are temporarily hidden — redirect to dashboard */}
         <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
         <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
       </Route>

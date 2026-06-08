@@ -317,7 +317,7 @@ class LeadCreate(BaseModel):
     email: Optional[EmailStr] = None
     area: Optional[str] = Field(None, max_length=120)
     package_id: Optional[int] = None
-    package: Optional[str] = Field(None, max_length=120)  # اسم الباقة لو مفيش id
+    package: Optional[str] = Field(None, max_length=120)  # package name when no package_id is sent
     preferred_time: Optional[str] = Field(None, max_length=120)
     note: Optional[str] = Field(None, max_length=1000)
     source: Optional[str] = Field("website", max_length=40)
@@ -342,7 +342,7 @@ class LeadOut(BaseModel):
 
 
 class LeadUpdate(BaseModel):
-    status: Optional[str] = None  # جديد/تم التواصل/محوّل/مغلق
+    status: Optional[str] = None  # lead status (new / contacted / converted / closed)
     note: Optional[str] = None
 
 

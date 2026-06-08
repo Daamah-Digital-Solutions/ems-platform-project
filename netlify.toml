@@ -1,9 +1,9 @@
-# إعداد Netlify لواجهة الـ CRM (Vite SPA)
+# Netlify configuration for the CRM frontend (Vite SPA)
 [build]
   command = "npm run build"
   publish = "dist"
 
-# توجيه كل المسارات للـ index.html عشان روتر React يشتغل (deep links / refresh)
+# SPA fallback so client-side routes (deep links / refresh) resolve to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -26,13 +26,7 @@ const TABS = [
   { k: 'studio', l: 'معلومات الستوديو', i: Building2 },
   { k: 'hours', l: 'ساعات العمل', i: Clock },
   { k: 'prayer', l: 'أوقات الصلاة', i: Sun },
-  // مخفي مؤقتاً — الفروع / الفريق / الأسعار / الأمان / الإشعارات / الفوترة
-  // { k: 'branches', l: 'الفروع', i: GitBranch },
-  // { k: 'team', l: 'الفريق', i: Users },
-  // { k: 'pricing', l: 'الأسعار والباقات', i: Package },
-  // { k: 'notifications', l: 'الإشعارات', i: Bell, soon: true },
-  // { k: 'billing', l: 'الفوترة', i: Receipt, soon: true },
-  // { k: 'security', l: 'الأمان', i: Shield }
+  // Other tabs (branches, team, pricing, security, notifications, billing) are temporarily hidden.
 ]
 
 export default function Settings() {
