@@ -16,6 +16,9 @@ __pycache__/
 .venv/
 venv/
 
+# secrets
+.env
+
 # backend local db & secrets
 backend/__pycache__/
 backend/app/__pycache__/

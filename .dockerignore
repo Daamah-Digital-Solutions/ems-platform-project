@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.vite
+backend
+*.md
+server.out
+server.err
+vite.out
+vite.err

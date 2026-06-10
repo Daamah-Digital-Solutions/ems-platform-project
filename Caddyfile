@@ -1,0 +1,16 @@
+# Caddy serves the SPA and reverse-proxies /api to the backend.
+# SITE_DOMAIN is injected from the environment (docker-compose).
+# A real domain → automatic HTTPS via Let's Encrypt. An IP or :80 → plain HTTP.
+{$SITE_DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
