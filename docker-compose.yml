@@ -21,7 +21,7 @@ services:
       DATABASE_URL: postgresql://ems:${POSTGRES_PASSWORD}@db:5432/ems
       SECRET_KEY: ${SECRET_KEY}
       PUBLIC_API_KEY: ${PUBLIC_API_KEY}
-      PUBLIC_STUDIO_ID: "1"
+      PUBLIC_STUDIO_ID: ${PUBLIC_STUDIO_ID:-1}
       ENV: production
       ZATCA_SANDBOX: "true"
       CORS_ORIGINS: ${SITE_URL}
