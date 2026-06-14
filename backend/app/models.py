@@ -262,3 +262,26 @@ class Invoice(Base):
     zatca_response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     items: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ----------- Payment (Tap payment links) -----------
+class Payment(Base):
+    __tablename__ = "payments"
+    __table_args__ = (
+        Index("ix_payment_studio_status", "studio_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    studio_id: Mapped[int] = mapped_column(ForeignKey("studios.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    package_id: Mapped[int] = mapped_column(ForeignKey("packages.id"))
+    amount: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(3), default="SAR")
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/paid/failed/expired
+    gateway: Mapped[str] = mapped_column(String(20), default="tap")
+    charge_id: Mapped[str | None] = mapped_column(String(60), index=True, nullable=True)
+    payment_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    method: Mapped[str | None] = mapped_column(String(40), nullable=True)  # filled after payment
+    subscription_id: Mapped[int | None] = mapped_column(ForeignKey("subscriptions.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

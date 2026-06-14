@@ -25,6 +25,9 @@ services:
       ENV: production
       ZATCA_SANDBOX: "true"
       CORS_ORIGINS: ${SITE_URL}
+      TAP_SECRET_KEY: ${TAP_SECRET_KEY:-}
+      TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://crm.emselriyadh.com}
     depends_on:
       db:
         condition: service_healthy

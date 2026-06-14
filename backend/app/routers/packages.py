@@ -79,15 +79,16 @@ def list_subscriptions(db: DB, studio_id: StudioId, status: str | None = None, l
     return out
 
 
-@router.post("/subscriptions", response_model=schemas.SubscriptionOut, status_code=201)
-def create_subscription(payload: schemas.SubscriptionCreate, db: DB, studio_id: StudioId):
-    c = db.get(models.Client, payload.client_id)
+def create_subscription_for(db, studio_id, client_id, package_id, price_paid=None, start_date=None):
+    """Create an active subscription for a client on a package. Reused by the
+    subscriptions endpoint and by the payments flow on successful payment."""
+    c = db.get(models.Client, client_id)
     if not c or c.studio_id != studio_id:
         raise HTTPException(400, "العميل غير موجود")
-    p = db.get(models.Package, payload.package_id)
+    p = db.get(models.Package, package_id)
     if not p or p.studio_id != studio_id:
         raise HTTPException(400, "الباقة غير موجودة")
-    start = payload.start_date or date.today()
+    start = start_date or date.today()
     end = start + timedelta(days=p.duration_months * 30)
     s = models.Subscription(
         studio_id=studio_id,
@@ -97,13 +98,21 @@ def create_subscription(payload: schemas.SubscriptionCreate, db: DB, studio_id: 
         end_date=end,
         sessions_total=p.sessions,
         sessions_remaining=p.sessions,
-        price_paid=payload.price_paid if payload.price_paid is not None else p.price,
+        price_paid=price_paid if price_paid is not None else p.price,
         status="نشطة",
     )
     db.add(s)
     db.commit()
     db.refresh(s)
     return s
+
+
+@router.post("/subscriptions", response_model=schemas.SubscriptionOut, status_code=201)
+def create_subscription(payload: schemas.SubscriptionCreate, db: DB, studio_id: StudioId):
+    return create_subscription_for(
+        db, studio_id, payload.client_id, payload.package_id,
+        price_paid=payload.price_paid, start_date=payload.start_date,
+    )
 
 
 @router.post("/subscriptions/{sub_id}/freeze")

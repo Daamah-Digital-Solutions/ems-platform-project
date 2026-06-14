@@ -17,12 +17,14 @@ import {
   FileText,
   Download,
   Snowflake,
-  Star
+  Star,
+  CreditCard
 } from 'lucide-react'
 import { clientsApi } from '../lib/api.js'
 import { useApi } from '../lib/useApi.js'
 import { cn, toArabicDigits, initials, avatarColor, formatNumberAr, waLink, telLink } from '../lib/utils.js'
 import ClientFormModal from '../components/ClientFormModal.jsx'
+import PaymentLinkModal from '../components/PaymentLinkModal.jsx'
 import { toast, comingSoon } from '../lib/toast.js'
 
 const TABS = [
@@ -109,6 +111,7 @@ export default function ClientDetail() {
   const { data: client, loading, reload } = useApi(() => clientsApi.get(Number(id)), [id])
   const [tab, setTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
 
   if (loading && !client) {
     return (
@@ -197,6 +200,9 @@ export default function ClientDetail() {
             <button onClick={() => navigate(`/bookings/new?client=${c.id}`)} className="btn-primary btn-sm">
               <Plus className="w-3.5 h-3.5" /> حجز جديد
             </button>
+            <button onClick={() => setPayOpen(true)} className="btn-secondary btn-sm">
+              <CreditCard className="w-3.5 h-3.5" /> رابط دفع
+            </button>
           </div>
         </div>
       </div>
@@ -231,6 +237,12 @@ export default function ClientDetail() {
         client={client}
         onClose={() => setEditOpen(false)}
         onSaved={() => { setEditOpen(false); reload() }}
+      />
+
+      <PaymentLinkModal
+        open={payOpen}
+        fixedClient={client}
+        onClose={() => setPayOpen(false)}
       />
     </div>
   )

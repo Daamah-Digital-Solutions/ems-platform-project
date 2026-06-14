@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     public_api_key: str = "dev-public-key-change-me"
     public_studio_id: int = 1
 
+    # Tap payment gateway
+    tap_secret_key: str = ""
+    tap_public_key: str = ""
+    tap_base_url: str = "https://api.tap.company/v2"
+    # Public base URL used to build payment redirect/webhook callbacks
+    public_base_url: str = "http://localhost:8001"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

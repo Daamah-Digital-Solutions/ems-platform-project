@@ -429,3 +429,31 @@ class ReportsOverview(BaseModel):
     trainer_performance: list[dict]
     funnel: list[dict]
     peak_heatmap: dict
+
+
+# -------- Payments (Tap) --------
+class PaymentCreate(BaseModel):
+    client_id: int
+    package_id: int
+    amount: Optional[float] = None  # defaults to the package price
+
+
+class PaymentOut(BaseModel):
+    model_config = _config()
+    id: int
+    studio_id: int
+    client_id: int
+    package_id: int
+    amount: float
+    currency: str
+    status: str
+    gateway: str
+    payment_url: Optional[str]
+    method: Optional[str]
+    subscription_id: Optional[int]
+    created_at: datetime
+    paid_at: Optional[datetime]
+    # joins
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
+    package_name: Optional[str] = None

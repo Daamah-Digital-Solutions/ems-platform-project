@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Plus, Edit, Snowflake, RotateCcw, MoreHorizontal, Crown, Calendar, Users, AlertTriangle } from 'lucide-react'
+import { Plus, Edit, Snowflake, RotateCcw, MoreHorizontal, Crown, Calendar, Users, AlertTriangle, CreditCard } from 'lucide-react'
 import { packagesApi } from '../lib/api.js'
 import { useApi } from '../lib/useApi.js'
 import { cn, toArabicDigits, formatNumberAr, initials, avatarColor } from '../lib/utils.js'
 import Modal from '../components/Modal.jsx'
+import PaymentLinkModal from '../components/PaymentLinkModal.jsx'
 import { toast } from '../lib/toast.js'
 
 export default function Packages() {
@@ -11,6 +12,7 @@ export default function Packages() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [payPkg, setPayPkg] = useState(null)
 
   const openNew = () => { setEditing(null); setFormOpen(true) }
   const openEdit = (p) => { setEditing(p); setFormOpen(true) }
@@ -33,6 +35,12 @@ export default function Packages() {
         pkg={editing}
         onClose={() => setFormOpen(false)}
         onSaved={onSaved}
+      />
+
+      <PaymentLinkModal
+        open={!!payPkg}
+        fixedPackage={payPkg}
+        onClose={() => setPayPkg(null)}
       />
 
       {/* Stats */}
@@ -72,7 +80,7 @@ export default function Packages() {
         </div>
 
         <div className="p-5 sm:p-6">
-          {tab === 'templates' && <Templates onEdit={openEdit} onNew={openNew} refreshKey={refreshKey} />}
+          {tab === 'templates' && <Templates onEdit={openEdit} onNew={openNew} onPay={setPayPkg} refreshKey={refreshKey} />}
           {tab === 'subscriptions' && <Subscriptions />}
         </div>
       </div>
@@ -80,7 +88,7 @@ export default function Packages() {
   )
 }
 
-function Templates({ onEdit, onNew, refreshKey }) {
+function Templates({ onEdit, onNew, onPay, refreshKey }) {
   const { data: packages = [] } = useApi(() => packagesApi.list(), [refreshKey])
   const list = packages || []
   return (
@@ -110,9 +118,14 @@ function Templates({ onEdit, onNew, refreshKey }) {
             </div>
           </div>
 
-          <button onClick={() => onEdit(p)} className="mt-5 w-full btn-secondary btn-sm">
-            <Edit className="w-3.5 h-3.5" /> تعديل
-          </button>
+          <div className="mt-5 flex gap-2">
+            <button onClick={() => onEdit(p)} className="btn-secondary btn-sm flex-1">
+              <Edit className="w-3.5 h-3.5" /> تعديل
+            </button>
+            <button onClick={() => onPay(p)} className="btn-primary btn-sm flex-1">
+              <CreditCard className="w-3.5 h-3.5" /> دفع
+            </button>
+          </div>
         </div>
       ))}
       <button onClick={onNew} className="rounded-card border-2 border-dashed border-border hover:border-brand hover:bg-brand-50/30 p-5 flex flex-col items-center justify-center gap-3 text-ink-secondary hover:text-brand transition-all min-h-[240px]">

@@ -15,6 +15,8 @@ import Reports from './pages/Reports.jsx'
 import Settings from './pages/Settings.jsx'
 import ComingSoon from './pages/ComingSoon.jsx'
 import Invoices from './pages/Invoices.jsx'
+import Payments from './pages/Payments.jsx'
+import PayResult from './pages/PayResult.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 
 export default function App() {
@@ -29,6 +31,8 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<Onboarding />} />
+      {/* Public payment result page (client-facing, after Tap redirect) */}
+      <Route path="/pay/result" element={<PayResult />} />
 
       {/* App shell routes */}
       <Route element={<AppLayout />}>
@@ -42,8 +46,8 @@ export default function App() {
         <Route path="/resources" element={<Resources />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
-        {/* Payments & Invoices are temporarily hidden — redirect to dashboard */}
-        <Route path="/payments" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/payments" element={<Payments />} />
+        {/* Invoices temporarily hidden — redirect to dashboard */}
         <Route path="/invoices" element={<Navigate to="/dashboard" replace />} />
       </Route>
 

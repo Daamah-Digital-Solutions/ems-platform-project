@@ -19,7 +19,8 @@ export const NAV_ITEMS = [
   { to: '/trainers', label: 'المدربين', icon: Dumbbell },
   { to: '/resources', label: 'الموارد', icon: Boxes },
   { to: '/reports', label: 'التقارير', icon: BarChart3 },
-  // Payments & Invoices are temporarily hidden.
+  { to: '/payments', label: 'المدفوعات', icon: CreditCard },
+  // Invoices temporarily hidden.
   { to: '/settings', label: 'الإعدادات', icon: Settings }
 ]
 

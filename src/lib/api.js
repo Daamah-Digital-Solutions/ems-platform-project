@@ -150,3 +150,11 @@ export const invoicesApi = {
   get: (id) => request(`/api/invoices/${id}`),
   create: (data) => request('/api/invoices', { method: 'POST', body: data })
 }
+
+// ============ Payments (Tap) ============
+export const paymentsApi = {
+  list: () => request('/api/payments'),
+  get: (id) => request(`/api/payments/${id}`),
+  create: (data) => request('/api/payments', { method: 'POST', body: data }),
+  refresh: (id) => request(`/api/payments/${id}/refresh`, { method: 'POST' })
+}
