@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search, Menu, X, Plus, LogOut, User } from 'lucide-react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
-import { getStoredUser, clearSession } from '../../lib/api.js'
+import { getStoredUser, getStoredStudio, clearSession } from '../../lib/api.js'
 import { NAV_ITEMS } from '../../lib/nav.js'
 import { cn } from '../../lib/utils.js'
 import { toast } from '../../lib/toast.js'
@@ -14,6 +14,8 @@ export default function TopBar() {
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const user = getStoredUser() || { name_ar: 'مستخدم', role: '', initials: 'MO' }
+  const studio = getStoredStudio() || {}
+  const brand = studio.name_en || studio.name_ar || 'MOVE'
 
   function doSearch(q) {
     const term = (q ?? search).trim()
@@ -37,7 +39,7 @@ export default function TopBar() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <Logo size="sm" />
+            <Logo size="sm" label={brand} />
           </div>
 
           {/* Search — desktop */}
@@ -113,7 +115,7 @@ export default function TopBar() {
           <div className="absolute inset-0 bg-black/40 animate-fade-in" onClick={() => setMobileMenu(false)} />
           <aside className="absolute top-0 right-0 bottom-0 w-[290px] bg-white animate-slide-down">
             <div className="h-16 flex items-center justify-between px-5 border-b border-border/60">
-              <Logo />
+              <Logo label={brand} />
               <button onClick={() => setMobileMenu(false)} className="p-2 -ml-2 rounded-lg hover:bg-bg">
                 <X className="w-5 h-5" />
               </button>

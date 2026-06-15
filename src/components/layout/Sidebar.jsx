@@ -11,7 +11,7 @@ export default function Sidebar() {
     <aside className="hidden lg:flex flex-col fixed top-0 right-0 bottom-0 w-[260px] bg-white border-l border-border/60 z-40">
       {/* Brand */}
       <div className="h-16 flex items-center px-5 border-b border-border/60">
-        <Logo />
+        <Logo label={studio.name_en || studio.name_ar || 'MOVE'} />
       </div>
 
       {/* Studio switcher */}

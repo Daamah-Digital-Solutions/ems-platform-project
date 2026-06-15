@@ -1,6 +1,6 @@
 import { cn } from '../lib/utils.js'
 
-export default function Logo({ className = '', invert = false, mark = false, size = 'md' }) {
+export default function Logo({ className = '', invert = false, mark = false, size = 'md', label = 'MOVE' }) {
   const sizes = {
     sm: { box: 'w-7 h-7', text: 'text-lg', svg: 'w-4 h-4', dot: 'w-1.5 h-1.5' },
     md: { box: 'w-9 h-9', text: 'text-2xl', svg: 'w-5 h-5', dot: 'w-2 h-2' },
@@ -52,7 +52,7 @@ export default function Logo({ className = '', invert = false, mark = false, siz
           )}
           style={{ letterSpacing: '-0.04em' }}
         >
-          MOVE
+          {label}
         </span>
       )}
     </div>
