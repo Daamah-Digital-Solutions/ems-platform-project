@@ -6,8 +6,8 @@ import { auth, setSession } from '../lib/api.js'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('demo@move.sa')
-  const [password, setPassword] = useState('demo123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -35,12 +35,12 @@ export default function Login() {
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-accent/20 rounded-full blur-3xl" />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
 
-        <Logo invert />
+        <Logo invert label="EMS Elriyadh" />
 
         <div className="relative">
           <Sparkles className="w-8 h-8 text-accent mb-6" />
           <blockquote className="text-3xl xl:text-4xl font-extrabold leading-tight tracking-tight">
-            "بعد ٣ أشهر من استخدام MOVE، توفّر علينا ٣ ساعات يومياً وقلّ الـ no-show ٦٠٪. ما نقدر نتخيل الستوديو بدونه."
+            "بعد ٣ أشهر من استخدام EMS Elriyadh، توفّر علينا ٣ ساعات يومياً وقلّ الـ no-show ٦٠٪. ما نقدر نتخيل الستوديو بدونه."
           </blockquote>
           <div className="mt-8 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-white text-brand flex items-center justify-center font-extrabold">
@@ -72,15 +72,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 flex justify-center">
-            <Logo />
-          </div>
-
-          {/* Demo banner */}
-          <div className="mb-7 flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
-            <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-900 leading-relaxed font-medium">
-              <span className="font-extrabold">هذا عرض تجريبي.</span> اضغط "تسجيل الدخول" للدخول مباشرة — أي بيانات تعمل.
-            </p>
+            <Logo label="EMS Elriyadh" />
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold text-ink-primary tracking-tight">
