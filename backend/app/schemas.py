@@ -85,10 +85,18 @@ class UserOut(BaseModel):
     studio_id: int
     name_ar: str
     name_en: Optional[str]
+    title: Optional[str] = None
     email: str
     phone: Optional[str]
     role: str
     initials: Optional[str]
+
+
+class ProfileUpdate(BaseModel):
+    name_ar: Optional[str] = None
+    title: Optional[str] = None
+    name_en: Optional[str] = None
+    phone: Optional[str] = None
 
 
 # -------- Trainer --------

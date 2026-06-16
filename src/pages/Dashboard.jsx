@@ -406,7 +406,7 @@ export default function Dashboard() {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-ink-primary tracking-tight">
-            {greetingByHour()}، {user.name_ar.split(' ')[0]} <span className="inline-block animate-bounce-subtle">👋</span>
+            {greetingByHour()}، {[user.title, user.name_ar.split(' ')[0]].filter(Boolean).join(' ')} <span className="inline-block animate-bounce-subtle">👋</span>
           </h1>
           <p className="text-sm text-ink-secondary mt-1">
             إليك ملخص يومك في <span className="font-extrabold text-ink-primary">{studio.name_ar}</span>

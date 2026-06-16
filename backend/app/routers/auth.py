@@ -110,3 +110,21 @@ def register(payload: schemas.RegisterStudioRequest, db: DB):
 @router.get("/me", response_model=schemas.UserOut)
 def me(user: CurrentUser):
     return user
+
+
+@router.patch("/me", response_model=schemas.UserOut)
+def update_me(payload: schemas.ProfileUpdate, db: DB, user: CurrentUser):
+    """Let the logged-in user edit their own display name + honorific title."""
+    data = payload.model_dump(exclude_unset=True)
+    if data.get("name_ar"):
+        user.name_ar = data["name_ar"].strip()
+        user.initials = "".join([w[0] for w in user.name_ar.split()[:2]]) or user.initials
+    if "title" in data:
+        user.title = (data["title"] or None)
+    if "name_en" in data:
+        user.name_en = data["name_en"] or None
+    if "phone" in data:
+        user.phone = data["phone"] or None
+    db.commit()
+    db.refresh(user)
+    return user

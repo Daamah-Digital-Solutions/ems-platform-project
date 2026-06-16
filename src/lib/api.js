@@ -78,7 +78,12 @@ export const auth = {
     request('/api/auth/login', { method: 'POST', body: { email, password }, auth: false }),
   register: (payload) =>
     request('/api/auth/register', { method: 'POST', body: payload, auth: false }),
-  me: () => request('/api/auth/me')
+  me: () => request('/api/auth/me'),
+  updateMe: (patch) => request('/api/auth/me', { method: 'PATCH', body: patch })
+}
+
+export function updateStoredUser(user) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 // ============ Studio ============

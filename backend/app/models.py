@@ -58,6 +58,7 @@ class User(Base):
     studio_id: Mapped[int] = mapped_column(ForeignKey("studios.id"), index=True)
     name_ar: Mapped[str] = mapped_column(String(120))
     name_en: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(20), nullable=True)  # honorific e.g. مستر / أ. / د.
     email: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     role: Mapped[str] = mapped_column(String(40), default="owner")  # owner, manager, staff

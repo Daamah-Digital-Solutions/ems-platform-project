@@ -6,6 +6,7 @@ import { NAV_ITEMS } from '../../lib/nav.js'
 import { cn } from '../../lib/utils.js'
 import { toast } from '../../lib/toast.js'
 import Logo from '../Logo.jsx'
+import ProfileModal from '../ProfileModal.jsx'
 
 export default function TopBar() {
   const navigate = useNavigate()
@@ -13,7 +14,9 @@ export default function TopBar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const user = getStoredUser() || { name_ar: 'مستخدم', role: '', initials: 'MO' }
+  const displayName = [user.title, user.name_ar].filter(Boolean).join(' ')
   const studio = getStoredStudio() || {}
   const brand = studio.name_en || studio.name_ar || 'MOVE'
 
@@ -83,7 +86,7 @@ export default function TopBar() {
                   {user.initials}
                 </span>
                 <div className="hidden xl:block text-right">
-                  <div className="text-xs font-extrabold leading-tight">{user.name_ar}</div>
+                  <div className="text-xs font-extrabold leading-tight">{displayName}</div>
                   <div className="text-[10px] text-ink-tertiary leading-tight">{user.role}</div>
                 </div>
               </button>
@@ -92,10 +95,10 @@ export default function TopBar() {
                   <div className="fixed inset-0 z-[60]" onClick={() => setMenuOpen(false)} />
                   <div className="absolute left-0 mt-2 w-52 bg-white rounded-xl shadow-card-hover border border-border/60 p-1.5 z-[70] animate-fade-in">
                     <div className="px-3 py-2 border-b border-border/40 mb-1">
-                      <div className="text-sm font-extrabold">{user.name_ar}</div>
+                      <div className="text-sm font-extrabold">{displayName}</div>
                       <div className="text-[10px] text-ink-tertiary">{user.role}</div>
                     </div>
-                    <button onClick={() => { setMenuOpen(false); navigate('/settings') }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-ink-secondary hover:bg-bg text-right">
+                    <button onClick={() => { setMenuOpen(false); setProfileOpen(true) }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-ink-secondary hover:bg-bg text-right">
                       <User className="w-4 h-4" /> الملف الشخصي
                     </button>
                     <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 text-right">
@@ -170,6 +173,8 @@ export default function TopBar() {
           </div>
         </div>
       )}
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
   )
 }
