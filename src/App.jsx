@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { getToken, auth, setSession } from './lib/api.js'
 import Landing from './pages/Landing.jsx'
 import Login from './pages/Login.jsx'
 import Onboarding from './pages/Onboarding.jsx'
@@ -19,12 +20,38 @@ import Payments from './pages/Payments.jsx'
 import PayResult from './pages/PayResult.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 
+// TEMPORARY: public read-only access so a shared dashboard link works without login.
+// To revert: delete this block + the auto-login effect below, and remove the viewer user.
+const VIEWER_EMAIL = 'viewer@emselriyadh.com'
+const VIEWER_PASSWORD = 'JttiMgYNgoltHMwYBygyyjGs'
+
 export default function App() {
   // Force RTL on load
   useEffect(() => {
     document.documentElement.dir = 'rtl'
     document.documentElement.lang = 'ar'
   }, [])
+
+  // TEMPORARY: if a protected page is opened without a session, sign in as the
+  // read-only viewer so the dashboard can be shared as a link. Remove to revert.
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/'
+  const isPublicPath = path === '/' || path === '/login' || path === '/onboarding' || path.startsWith('/pay')
+  const [ready, setReady] = useState(!!getToken() || isPublicPath)
+  useEffect(() => {
+    if (ready) return
+    auth.login(VIEWER_EMAIL, VIEWER_PASSWORD)
+      .then(setSession)
+      .catch(() => {})
+      .finally(() => setReady(true))
+  }, [ready])
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-ink-tertiary font-bold">
+        جارٍ التحميل...
+      </div>
+    )
+  }
 
   return (
     <Routes>
