@@ -35,7 +35,7 @@ export default function App() {
   // TEMPORARY: if a protected page is opened without a session, sign in as the
   // read-only viewer so the dashboard can be shared as a link. Remove to revert.
   const path = typeof window !== 'undefined' ? window.location.pathname : '/'
-  const isPublicPath = path === '/' || path === '/login' || path === '/onboarding' || path.startsWith('/pay')
+  const isPublicPath = path === '/login' || path === '/onboarding' || path.startsWith('/pay')
   const [ready, setReady] = useState(!!getToken() || isPublicPath)
   useEffect(() => {
     if (ready) return
@@ -55,7 +55,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      {/* TEMPORARY (promo): root opens the dashboard directly instead of the landing page */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<Onboarding />} />
       {/* Public payment result page (client-facing, after Tap redirect) */}
