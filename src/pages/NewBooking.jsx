@@ -591,10 +591,6 @@ function Success({ data, onGo }) {
         <p className="text-ink-secondary mt-3">
           تم حجز جلسة <strong>{data.client?.name_ar}</strong> مع <strong>{data.trainer?.name_ar}</strong> — <strong className="tabular">{fmtDateAr(data.date)}</strong> الساعة <strong className="tabular">{fmtTime12Ar(data.time)}</strong>.
         </p>
-        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-extrabold">
-          <Check className="w-3.5 h-3.5" strokeWidth={3} />
-          تذكير واتساب سيُرسل تلقائياً قبل ساعة
-        </div>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
           <button onClick={onGo} className="btn-primary">
             <Calendar className="w-4 h-4" /> عرض الحجوزات
