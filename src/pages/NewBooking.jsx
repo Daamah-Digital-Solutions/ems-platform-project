@@ -66,8 +66,8 @@ export default function NewBooking() {
   const [submitError, setSubmitError] = useState('')
   const [data, setData] = useState({
     client: null,
-    date: toISODate(new Date()),
-    time: '',
+    date: toISODate(new Date()), // day currently being viewed in the time grid
+    slots: [], // chosen appointments: [{ date, time }]
     trainer: null,
     machine: null,
     suit: null,
@@ -94,7 +94,7 @@ export default function NewBooking() {
 
   const canNext = [
     () => !!data.client,
-    () => !!data.time,
+    () => data.slots.length > 0,
     () => !!data.trainer,
     () => !!data.machine && !!data.suit,
     () => ((data.client?.parq_flags?.length || data.client?.parqFlags?.length) ? data.parqAck : true)
@@ -103,26 +103,40 @@ export default function NewBooking() {
   async function submit() {
     setSubmitting(true)
     setSubmitError('')
-    try {
-      // Naive local datetime (no timezone) → server stores the KSA wall-clock,
-      // so its prayer-window + availability checks line up with what the user picked.
-      const start_time = `${data.date}T${data.time}:00`
-      await bookingsApi.create({
-        client_id: data.client.id,
-        trainer_id: data.trainer.id,
-        machine_id: data.machine.id,
-        suit_id: data.suit?.id,
-        start_time,
-        duration_min: 20,
-        note: data.note || undefined,
-        parq_ack: !!data.parqAck,
-      })
-      setDone(true)
-    } catch (e) {
-      setSubmitError(e.message || 'فشل إنشاء الحجز')
-    } finally {
-      setSubmitting(false)
+    // Chronological order so bookings are created earliest-first.
+    const slots = [...data.slots].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
+    const base = {
+      client_id: data.client.id,
+      trainer_id: data.trainer.id,
+      machine_id: data.machine.id,
+      suit_id: data.suit?.id,
+      duration_min: 20,
+      note: data.note || undefined,
+      parq_ack: !!data.parqAck,
     }
+    // Naive local datetime (no timezone) → server stores the KSA wall-clock.
+    const results = await Promise.allSettled(
+      slots.map((s) => bookingsApi.create({ ...base, start_time: `${s.date}T${s.time}:00` }))
+    )
+    const failed = []
+    results.forEach((r, i) => { if (r.status === 'rejected') failed.push({ slot: slots[i], reason: r.reason }) })
+    const okCount = slots.length - failed.length
+
+    if (failed.length === 0) {
+      setDone(true)
+    } else {
+      // Keep only the failed slots so the user can adjust & retry (successful ones are already booked).
+      set({ slots: failed.map((f) => f.slot) })
+      const details = failed
+        .map((f) => `${fmtDateAr(f.slot.date)} ${fmtTime12Ar(f.slot.time)} (${f.reason?.message || 'خطأ'})`)
+        .join('، ')
+      setSubmitError(
+        (okCount > 0 ? `تم حجز ${toArabicDigits(okCount)} موعد بنجاح. ` : '') +
+        `تعذّر حجز: ${details}. عدّل المواعيد المتبقية وحاول مرة أخرى.`
+      )
+      setStep(1)
+    }
+    setSubmitting(false)
   }
 
   return (
@@ -202,7 +216,7 @@ export default function NewBooking() {
               </>
             ) : (
               <>
-                <Check className="w-4 h-4" /> تأكيد الحجز
+                <Check className="w-4 h-4" /> {data.slots.length > 1 ? `تأكيد ${toArabicDigits(data.slots.length)} حجوزات` : 'تأكيد الحجز'}
               </>
             )
           ) : (
@@ -306,34 +320,59 @@ function StepTime({ data, set }) {
   const isToday = data.date === toISODate(new Date())
   const now = new Date()
 
+  const slots = data.slots || []
+  const dayCount = slots.filter((s) => s.date === data.date).length
+  const toggle = (t) => {
+    const exists = slots.some((s) => s.date === data.date && s.time === t)
+    const next = exists
+      ? slots.filter((s) => !(s.date === data.date && s.time === t))
+      : [...slots, { date: data.date, time: t }]
+    set({ slots: next })
+  }
+  const removeSlot = (s) => set({ slots: slots.filter((x) => !(x.date === s.date && x.time === s.time)) })
+  const sorted = [...slots].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
+
   return (
     <div className="card p-5 sm:p-6">
-      <h3 className="font-extrabold text-ink-primary mb-1">اختر التاريخ والوقت</h3>
-      <p className="text-sm text-ink-secondary mb-4">اختر اليوم ثم الوقت المتاح. الأوقات الرمادية محجوزة أو وقت صلاة.</p>
+      <h3 className="font-extrabold text-ink-primary mb-1">اختر المواعيد</h3>
+      <p className="text-sm text-ink-secondary mb-4">
+        تقدر تختار <strong>أكثر من موعد</strong> — حتى في أيام مختلفة — لنفس العميل. اضغط على الوقت لإضافته أو إزالته.
+      </p>
 
-      {/* Day selector — from today, 14 days ahead */}
+      {/* Day selector — from today, 14 days ahead. Dot = day has picked slots. */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-1 px-1">
         {days.map((d, i) => {
           const iso = toISODate(d)
-          const selected = data.date === iso
+          const active = data.date === iso
+          const picked = slots.filter((s) => s.date === iso).length
           const label = i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_AR[d.getDay()]
           return (
             <button
               key={iso}
-              onClick={() => set({ date: iso, time: '' })}
+              onClick={() => set({ date: iso })}
               className={cn(
-                'flex-shrink-0 w-[74px] rounded-xl p-2.5 text-center border-2 transition-all',
-                selected ? 'bg-brand text-white border-brand shadow-glow' : 'bg-bg border-border hover:border-brand-200'
+                'relative flex-shrink-0 w-[74px] rounded-xl p-2.5 text-center border-2 transition-all',
+                active ? 'bg-brand text-white border-brand shadow-glow' : 'bg-bg border-border hover:border-brand-200'
               )}
             >
-              <div className={cn('text-[10px] font-bold', selected ? 'opacity-90' : 'text-ink-tertiary')}>{label}</div>
+              <div className={cn('text-[10px] font-bold', active ? 'opacity-90' : 'text-ink-tertiary')}>{label}</div>
               <div className="text-xl font-extrabold tabular mt-0.5">{toArabicDigits(d.getDate())}</div>
+              {picked > 0 && (
+                <span className={cn(
+                  'absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold flex items-center justify-center',
+                  active ? 'bg-white text-brand' : 'bg-brand text-white'
+                )}>
+                  {toArabicDigits(picked)}
+                </span>
+              )}
             </button>
           )
         })}
       </div>
 
-      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-tertiary mb-2">الأوقات المتاحة</div>
+      <div className="text-xs font-extrabold uppercase tracking-wider text-ink-tertiary mb-2">
+        الأوقات المتاحة {dayCount > 0 && <span className="text-brand">• مختار {toArabicDigits(dayCount)} في هذا اليوم</span>}
+      </div>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {SLOT_TIMES.map((t) => {
           const [h, mi] = t.split(':').map(Number)
@@ -358,14 +397,14 @@ function StepTime({ data, set }) {
           }).length
           const full = capacity > 0 && busyCount >= capacity
           const disabled = past || prayerHit || full
-          const selected = data.time === t
+          const selected = slots.some((s) => s.date === data.date && s.time === t)
           return (
             <button
               key={t}
               disabled={disabled}
-              onClick={() => set({ time: t })}
+              onClick={() => toggle(t)}
               className={cn(
-                'h-14 rounded-lg text-sm font-extrabold tabular border transition-all flex flex-col items-center justify-center',
+                'h-14 rounded-lg text-sm font-extrabold tabular border transition-all flex flex-col items-center justify-center relative',
                 selected
                   ? 'bg-brand text-white border-brand shadow-glow'
                   : disabled
@@ -373,6 +412,7 @@ function StepTime({ data, set }) {
                   : 'bg-white text-ink-primary border-border hover:border-brand-200 hover:bg-brand-50/30'
               )}
             >
+              {selected && <Check className="w-3 h-3 absolute top-1 left-1" strokeWidth={3} />}
               <span>{fmtTime12Ar(t)}</span>
               {prayerHit && <span className="text-[8px] font-bold text-amber-600">صلاة</span>}
               {!prayerHit && full && <span className="text-[8px] font-bold text-ink-tertiary">محجوز</span>}
@@ -381,6 +421,32 @@ function StepTime({ data, set }) {
           )
         })}
       </div>
+
+      {/* Selected appointments summary (across all days) */}
+      {sorted.length > 0 && (
+        <div className="mt-5 pt-4 border-t border-border">
+          <div className="text-xs font-extrabold uppercase tracking-wider text-ink-tertiary mb-2">
+            المواعيد المختارة ({toArabicDigits(sorted.length)})
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sorted.map((s) => (
+              <span
+                key={`${s.date}T${s.time}`}
+                className="inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full bg-brand-50 text-brand border border-brand-200 text-xs font-bold"
+              >
+                {fmtDateAr(s.date)} · {fmtTime12Ar(s.time)}
+                <button
+                  onClick={() => removeSlot(s)}
+                  className="w-4 h-4 rounded-full bg-brand/15 hover:bg-brand hover:text-white flex items-center justify-center text-[11px] leading-none"
+                  aria-label="إزالة"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -392,7 +458,7 @@ function StepTrainer({ data, set }) {
   return (
     <div className="card p-5 sm:p-6">
       <h3 className="font-extrabold text-ink-primary mb-1">اختر المدرب</h3>
-      <p className="text-sm text-ink-secondary mb-4">المدربين المتاحين في الوقت المختار.</p>
+      <p className="text-sm text-ink-secondary mb-4">نفس المدرب لكل المواعيد المختارة.</p>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {list.map((t) => {
@@ -447,7 +513,7 @@ function StepResource({ data, set }) {
     <div className="space-y-5">
       <div className="card p-5 sm:p-6">
         <h3 className="font-extrabold text-ink-primary mb-1">اختر الجهاز</h3>
-        <p className="text-sm text-ink-secondary mb-4">الأجهزة المتاحة في الوقت المختار.</p>
+        <p className="text-sm text-ink-secondary mb-4">نفس الجهاز لكل المواعيد المختارة.</p>
         <div className="grid sm:grid-cols-3 gap-3">
           {availableMachines.map((m) => {
             const selected = data.machine?.id === m.id
@@ -512,6 +578,7 @@ function StepConfirm({ data, set }) {
   const flags = data.client?.parq_flags || data.client?.parqFlags || []
   const hasFlags = flags.length > 0
   const suitNum = data.suit?.label ? String(data.suit.label).match(/\d+/)?.[0] : String(data.suit?.id || '')
+  const appts = [...(data.slots || [])].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
   return (
     <div className="space-y-5">
       <div className="card p-5 sm:p-6">
@@ -521,8 +588,6 @@ function StepConfirm({ data, set }) {
         <div className="space-y-3">
           {[
             { i: Users, l: 'العميل', v: data.client?.name_ar },
-            { i: Calendar, l: 'التاريخ', v: fmtDateAr(data.date) },
-            { i: Clock, l: 'الوقت', v: fmtTime12Ar(data.time) },
             { i: Users, l: 'المدرب', v: data.trainer?.name_ar },
             { i: Cpu, l: 'الجهاز', v: data.machine?.label },
             { i: Layers, l: 'البدلة', v: `#${suitNum} (${data.client?.suit_size || data.client?.suitSize || 'M'})` }
@@ -535,6 +600,28 @@ function StepConfirm({ data, set }) {
               <span className="font-extrabold text-ink-primary">{row.v}</span>
             </div>
           ))}
+        </div>
+
+        {/* Appointments list */}
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Calendar className="w-4 h-4 text-brand" />
+            <span className="text-sm font-extrabold text-ink-primary">المواعيد ({toArabicDigits(appts.length)})</span>
+          </div>
+          <div className="space-y-2">
+            {appts.map((s) => (
+              <div key={`${s.date}T${s.time}`} className="flex items-center gap-3 p-3 rounded-xl bg-brand-50/50 border border-brand-100">
+                <span className="w-9 h-9 rounded-lg bg-white text-brand flex items-center justify-center shadow-sm">
+                  <Clock className="w-4 h-4" />
+                </span>
+                <span className="text-sm font-bold text-ink-primary flex-1">{fmtDateAr(s.date)}</span>
+                <span className="font-extrabold text-brand tabular">{fmtTime12Ar(s.time)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-ink-tertiary mt-2">
+            سيتم إنشاء {toArabicDigits(appts.length)} حجز بنفس المدرب والجهاز والبدلة. كل حجز يخصم جلسة من باقة العميل.
+          </p>
         </div>
 
         <div className="mt-5">
@@ -589,8 +676,19 @@ function Success({ data, onGo }) {
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight">تم الحجز بنجاح!</h1>
         <p className="text-ink-secondary mt-3">
-          تم حجز جلسة <strong>{data.client?.name_ar}</strong> مع <strong>{data.trainer?.name_ar}</strong> — <strong className="tabular">{fmtDateAr(data.date)}</strong> الساعة <strong className="tabular">{fmtTime12Ar(data.time)}</strong>.
+          تم حجز <strong>{toArabicDigits((data.slots || []).length)}</strong> {(data.slots || []).length > 1 ? 'مواعيد' : 'موعد'} لـ{' '}
+          <strong>{data.client?.name_ar}</strong> مع <strong>{data.trainer?.name_ar}</strong>.
         </p>
+        <div className="mt-4 inline-flex flex-col gap-1.5 text-right">
+          {[...(data.slots || [])]
+            .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
+            .map((s) => (
+              <div key={`${s.date}T${s.time}`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-extrabold">
+                <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                {fmtDateAr(s.date)} · {fmtTime12Ar(s.time)}
+              </div>
+            ))}
+        </div>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
           <button onClick={onGo} className="btn-primary">
             <Calendar className="w-4 h-4" /> عرض الحجوزات
