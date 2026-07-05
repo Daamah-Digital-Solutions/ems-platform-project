@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
@@ -19,13 +19,42 @@ import { useApi } from '../lib/useApi.js'
 import { cn, toArabicDigits, initials, avatarColor } from '../lib/utils.js'
 
 const STEPS = ['العميل', 'الوقت', 'المدرب', 'الجهاز', 'تأكيد']
-const TIME_SLOTS = [
-  '6:00', '6:30', '7:00', '7:30', '8:00', '8:30', '9:00',
-  '10:00', '10:30', '11:00', '11:30',
-  '1:00', '2:00', '3:00', '4:00', '4:30', '5:00', '5:30', '6:00', '6:30', '7:00', '7:30'
-]
-const BOOKED = new Set(['6:00', '6:30', '7:30', '11:00', '5:00', '5:30'])
-const PRAYER = new Set(['12:00', '3:30', '6:00'])
+
+const pad = (n) => String(n).padStart(2, '0')
+// 06:00 → 22:00 every 30 min, as 24h "HH:MM"
+const SLOT_TIMES = (() => {
+  const out = []
+  for (let m = 6 * 60; m <= 22 * 60; m += 30) out.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`)
+  return out
+})()
+const WEEKDAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+const toISODate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+function fmtTime12Ar(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  const period = h < 12 ? 'ص' : 'م'
+  let hh = h % 12
+  if (hh === 0) hh = 12
+  return `${toArabicDigits(hh)}:${toArabicDigits(pad(m))} ${period}`
+}
+function fmtDateAr(iso) {
+  if (!iso) return ''
+  const [y, mo, da] = iso.split('-').map(Number)
+  const d = new Date(y, mo - 1, da)
+  const today = toISODate(new Date())
+  const tmr = toISODate(new Date(Date.now() + 86400000))
+  const label = iso === today ? 'اليوم' : iso === tmr ? 'غدًا' : WEEKDAYS_AR[d.getDay()]
+  return `${label} ${toArabicDigits(da)}/${toArabicDigits(mo)}`
+}
+function nextDays(n) {
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(base)
+    d.setDate(base.getDate() + i)
+    return d
+  })
+}
 
 export default function NewBooking() {
   const navigate = useNavigate()
@@ -37,6 +66,7 @@ export default function NewBooking() {
   const [submitError, setSubmitError] = useState('')
   const [data, setData] = useState({
     client: null,
+    date: toISODate(new Date()),
     time: '',
     trainer: null,
     machine: null,
@@ -74,20 +104,15 @@ export default function NewBooking() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      // Compose start_time: today + chosen HH:MM (the wizard uses arabic-friendly slot like "5:30" meaning PM later)
-      const now = new Date()
-      const [hStr, mStr] = data.time.split(':')
-      let h = parseInt(hStr)
-      const m = parseInt(mStr || '0')
-      // Times like 1:00..7:30 are PM in the wizard semantics
-      if (h >= 1 && h <= 9) h += 12
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0)
+      // Naive local datetime (no timezone) → server stores the KSA wall-clock,
+      // so its prayer-window + availability checks line up with what the user picked.
+      const start_time = `${data.date}T${data.time}:00`
       await bookingsApi.create({
         client_id: data.client.id,
         trainer_id: data.trainer.id,
         machine_id: data.machine.id,
         suit_id: data.suit?.id,
-        start_time: start.toISOString(),
+        start_time,
         duration_min: 20,
         note: data.note || undefined,
         parq_ack: !!data.parqAck,
@@ -271,48 +296,87 @@ function StepClient({ data, set }) {
 }
 
 function StepTime({ data, set }) {
+  const days = useMemo(() => nextDays(14), [])
+  const { data: avail } = useApi(() => bookingsApi.availability(data.date), [data.date])
+  const { data: machines = [] } = useApi(() => resourcesApi.listMachines(), [])
+  const capacity = (machines || []).filter((m) => m.status !== 'صيانة مجدولة').length
+  const prayers = avail?.prayers || []
+  const blockPrayer = avail?.block_prayer !== false
+  const busy = avail?.busy || []
+  const isToday = data.date === toISODate(new Date())
+  const now = new Date()
+
   return (
     <div className="card p-5 sm:p-6">
       <h3 className="font-extrabold text-ink-primary mb-1">اختر التاريخ والوقت</h3>
-      <p className="text-sm text-ink-secondary mb-4">الأوقات المظللة بالأمان متاحة. الأوقات الرمادية محجوزة أو وقت صلاة.</p>
-      <div className="mb-5 grid grid-cols-7 gap-2">
-        {['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'].map((d, i) => (
-          <button
-            key={d}
-            className={cn(
-              'rounded-lg p-2 text-center border transition-all',
-              i === 0 ? 'bg-brand text-white border-brand' : 'bg-bg border-border hover:border-brand-200'
-            )}
-          >
-            <div className="text-[10px] font-bold opacity-80">{d.slice(0, 3)}</div>
-            <div className="text-lg font-extrabold tabular">{toArabicDigits(12 + i)}</div>
-          </button>
-        ))}
+      <p className="text-sm text-ink-secondary mb-4">اختر اليوم ثم الوقت المتاح. الأوقات الرمادية محجوزة أو وقت صلاة.</p>
+
+      {/* Day selector — from today, 14 days ahead */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-1 px-1">
+        {days.map((d, i) => {
+          const iso = toISODate(d)
+          const selected = data.date === iso
+          const label = i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : WEEKDAYS_AR[d.getDay()]
+          return (
+            <button
+              key={iso}
+              onClick={() => set({ date: iso, time: '' })}
+              className={cn(
+                'flex-shrink-0 w-[74px] rounded-xl p-2.5 text-center border-2 transition-all',
+                selected ? 'bg-brand text-white border-brand shadow-glow' : 'bg-bg border-border hover:border-brand-200'
+              )}
+            >
+              <div className={cn('text-[10px] font-bold', selected ? 'opacity-90' : 'text-ink-tertiary')}>{label}</div>
+              <div className="text-xl font-extrabold tabular mt-0.5">{toArabicDigits(d.getDate())}</div>
+            </button>
+          )
+        })}
       </div>
 
       <div className="text-xs font-extrabold uppercase tracking-wider text-ink-tertiary mb-2">الأوقات المتاحة</div>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-        {TIME_SLOTS.map((t, ti) => {
-          const booked = BOOKED.has(t)
-          const prayer = PRAYER.has(t)
-          const disabled = booked || prayer
+        {SLOT_TIMES.map((t) => {
+          const [h, mi] = t.split(':').map(Number)
+          const [y, mo, da] = data.date.split('-').map(Number)
+          const slotStart = new Date(y, mo - 1, da, h, mi, 0, 0)
+          const slotEnd = new Date(slotStart.getTime() + 20 * 60000)
+          const past = isToday && slotStart <= now
+          let prayerHit = false
+          if (blockPrayer) {
+            for (const p of prayers) {
+              const pt = new Date(p.time)
+              const buf = (p.buffer_min || 10) * 60000
+              if (slotStart < new Date(pt.getTime() + buf) && slotEnd > new Date(pt.getTime() - buf)) {
+                prayerHit = true
+                break
+              }
+            }
+          }
+          const busyCount = busy.filter((b) => {
+            const bs = new Date(b.start)
+            return bs.getHours() === h && bs.getMinutes() === mi
+          }).length
+          const full = capacity > 0 && busyCount >= capacity
+          const disabled = past || prayerHit || full
           const selected = data.time === t
           return (
             <button
-              key={`${t}-${ti}`}
+              key={t}
               disabled={disabled}
               onClick={() => set({ time: t })}
               className={cn(
-                'h-12 rounded-lg text-sm font-extrabold tabular border transition-all',
-                disabled && !selected
-                  ? 'bg-bg text-ink-tertiary border-border cursor-not-allowed line-through'
-                  : selected
+                'h-14 rounded-lg text-sm font-extrabold tabular border transition-all flex flex-col items-center justify-center',
+                selected
                   ? 'bg-brand text-white border-brand shadow-glow'
+                  : disabled
+                  ? 'bg-bg text-ink-tertiary border-border cursor-not-allowed'
                   : 'bg-white text-ink-primary border-border hover:border-brand-200 hover:bg-brand-50/30'
               )}
             >
-              {toArabicDigits(t)}
-              {prayer && <span className="block text-[8px] font-bold text-amber-600">صلاة</span>}
+              <span>{fmtTime12Ar(t)}</span>
+              {prayerHit && <span className="text-[8px] font-bold text-amber-600">صلاة</span>}
+              {!prayerHit && full && <span className="text-[8px] font-bold text-ink-tertiary">محجوز</span>}
+              {!prayerHit && !full && past && <span className="text-[8px] font-bold text-ink-tertiary">انتهى</span>}
             </button>
           )
         })}
@@ -457,7 +521,8 @@ function StepConfirm({ data, set }) {
         <div className="space-y-3">
           {[
             { i: Users, l: 'العميل', v: data.client?.name_ar },
-            { i: Clock, l: 'الوقت', v: `${toArabicDigits(data.time)} م` },
+            { i: Calendar, l: 'التاريخ', v: fmtDateAr(data.date) },
+            { i: Clock, l: 'الوقت', v: fmtTime12Ar(data.time) },
             { i: Users, l: 'المدرب', v: data.trainer?.name_ar },
             { i: Cpu, l: 'الجهاز', v: data.machine?.label },
             { i: Layers, l: 'البدلة', v: `#${suitNum} (${data.client?.suit_size || data.client?.suitSize || 'M'})` }
@@ -524,7 +589,7 @@ function Success({ data, onGo }) {
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight">تم الحجز بنجاح!</h1>
         <p className="text-ink-secondary mt-3">
-          تم حجز جلسة <strong>{data.client?.name_ar}</strong> مع <strong>{data.trainer?.name_ar}</strong> في تمام الساعة <strong className="tabular">{toArabicDigits(data.time)} م</strong>.
+          تم حجز جلسة <strong>{data.client?.name_ar}</strong> مع <strong>{data.trainer?.name_ar}</strong> — <strong className="tabular">{fmtDateAr(data.date)}</strong> الساعة <strong className="tabular">{fmtTime12Ar(data.time)}</strong>.
         </p>
         <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-extrabold">
           <Check className="w-3.5 h-3.5" strokeWidth={3} />
