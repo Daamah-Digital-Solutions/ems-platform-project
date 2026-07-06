@@ -339,7 +339,21 @@ function StepTime({ data, set }) {
         تقدر تختار <strong>أكثر من موعد</strong> — حتى في أيام مختلفة — لنفس العميل. اضغط على الوقت لإضافته أو إزالته.
       </p>
 
-      {/* Day selector — from today, 14 days ahead. Dot = day has picked slots. */}
+      {/* Any-day date picker — pick any future day, not just the next 14 */}
+      <div className="flex flex-wrap items-center gap-2.5 mb-3">
+        <span className="text-xs font-extrabold text-ink-tertiary">اختر أي يوم:</span>
+        <input
+          type="date"
+          value={data.date}
+          min={toISODate(new Date())}
+          onChange={(e) => { if (e.target.value) set({ date: e.target.value }) }}
+          className="input tabular"
+          style={{ width: 'auto', minHeight: 42, paddingInline: 14 }}
+        />
+        <span className="text-sm font-extrabold text-brand">{fmtDateAr(data.date)}</span>
+      </div>
+
+      {/* Quick shortcuts — next 14 days. Badge = day has picked slots. */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-5 -mx-1 px-1">
         {days.map((d, i) => {
           const iso = toISODate(d)
@@ -371,7 +385,7 @@ function StepTime({ data, set }) {
       </div>
 
       <div className="text-xs font-extrabold uppercase tracking-wider text-ink-tertiary mb-2">
-        الأوقات المتاحة {dayCount > 0 && <span className="text-brand">• مختار {toArabicDigits(dayCount)} في هذا اليوم</span>}
+        أوقات {fmtDateAr(data.date)} {dayCount > 0 && <span className="text-brand">• مختار {toArabicDigits(dayCount)}</span>}
       </div>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {SLOT_TIMES.map((t) => {

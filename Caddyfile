@@ -10,6 +10,13 @@
 
 	handle {
 		root * /srv
+		# Hashed build assets never change → cache them for a year.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# The HTML shell (and SPA route fallbacks) must never be cached, so a new
+		# deploy shows up immediately instead of loading a stale index.html.
+		@notassets not path /assets/*
+		header @notassets Cache-Control "no-cache, must-revalidate"
 		try_files {path} /index.html
 		file_server
 	}
