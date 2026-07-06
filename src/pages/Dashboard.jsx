@@ -347,30 +347,6 @@ function TopPerformersCard({ topPerformers = [] }) {
   )
 }
 
-// =============== Quick Stats Strip ===============
-function QuickStats() {
-  return (
-    <section className="card p-5 sm:p-6 relative overflow-hidden bg-gradient-to-bl from-brand-50/40 to-white border-brand-100/80">
-      <div className="absolute -top-20 -left-20 w-48 h-48 bg-brand/8 rounded-full blur-3xl" />
-      <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { l: 'حجوزات الأسبوع', v: '١٥٠', t: 'text-brand' },
-          { l: 'جلسات ساعة الذروة', v: '٤٠', t: 'text-accent' },
-          { l: 'متوسط مدة الجلسة', v: '٢٠د', t: 'text-emerald-600' },
-          { l: 'معدل الاحتفاظ', v: '٨٢٪', t: 'text-indigo-600' }
-        ].map((s) => (
-          <div key={s.l}>
-            <div className={cn('text-2xl sm:text-3xl font-extrabold tabular tracking-tight', s.t)}>
-              {s.v}
-            </div>
-            <div className="text-[11px] sm:text-xs text-ink-secondary font-bold mt-0.5">{s.l}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 // =============== MAIN DASHBOARD ===============
 export default function Dashboard() {
   const user = getStoredUser() || { name_ar: 'مستخدم' }
@@ -490,9 +466,6 @@ export default function Dashboard() {
           }
         />
       </div>
-
-      {/* Quick stats strip */}
-      <QuickStats />
 
       {/* Grid: Schedule + Side */}
       <div className="grid lg:grid-cols-3 gap-5">
