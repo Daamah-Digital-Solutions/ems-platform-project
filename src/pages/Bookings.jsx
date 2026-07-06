@@ -108,7 +108,7 @@ export default function Bookings() {
             ))}
           </div>
           <button onClick={() => setCurrent(new Date())} className="btn-secondary btn-sm">اليوم</button>
-          <Link to="/bookings/new" className="btn-primary btn-sm">
+          <Link to={`/bookings/new?date=${ymd(current)}`} className="btn-primary btn-sm">
             <Plus className="w-4 h-4" /> حجز جديد
           </Link>
         </div>
@@ -145,7 +145,7 @@ export default function Bookings() {
 
       {loading && <div className="card p-12 text-center text-ink-tertiary font-bold">جاري التحميل...</div>}
 
-      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} />}
+      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} dateISO={ymd(current)} />}
       {!loading && view === 'week' && <WeekView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} />}
       {!loading && view === 'month' && <MonthView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} />}
 
@@ -168,7 +168,7 @@ export default function Bookings() {
   )
 }
 
-function DayView({ bookings, machines }) {
+function DayView({ bookings, machines, dateISO }) {
   const cols = machines.length || 1
   const gridCols = `80px repeat(${cols}, minmax(120px, 1fr))`
 
@@ -235,7 +235,7 @@ function DayView({ bookings, machines }) {
                     return (
                       <Link
                         key={m.id}
-                        to="/bookings/new"
+                        to={`/bookings/new?date=${dateISO}&time=${pad(h)}:00`}
                         className="border-l border-border/40 last:border-l-0 hover:bg-brand-50/20 transition-colors group min-h-[60px] flex items-center justify-center"
                       >
                         <span className="opacity-0 group-hover:opacity-100 text-xs text-brand font-extrabold">+ حجز</span>

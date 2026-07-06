@@ -60,19 +60,27 @@ export default function NewBooking() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const preClientId = searchParams.get('client')
+  const preDate = searchParams.get('date')
+  const preTime = searchParams.get('time')
   const [step, setStep] = useState(0)
   const [done, setDone] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
-  const [data, setData] = useState({
-    client: null,
-    date: toISODate(new Date()), // day currently being viewed in the time grid
-    slots: [], // chosen appointments: [{ date, time }]
-    trainer: null,
-    machine: null,
-    suit: null,
-    note: '',
-    parqAck: false
+  const [data, setData] = useState(() => {
+    // Carry over the day (and optionally the hour) chosen on the bookings calendar.
+    const todayISO = toISODate(new Date())
+    const validDate = preDate && /^\d{4}-\d{2}-\d{2}$/.test(preDate) && preDate >= todayISO ? preDate : todayISO
+    const validTime = preTime && /^\d{1,2}:\d{2}$/.test(preTime)
+    return {
+      client: null,
+      date: validDate, // day currently being viewed in the time grid
+      slots: validTime ? [{ date: validDate, time: preTime.padStart(5, '0') }] : [], // [{ date, time }]
+      trainer: null,
+      machine: null,
+      suit: null,
+      note: '',
+      parqAck: false
+    }
   })
   const set = (p) => setData((d) => ({ ...d, ...p }))
 
