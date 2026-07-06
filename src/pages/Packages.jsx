@@ -18,6 +18,35 @@ export default function Packages() {
   const openEdit = (p) => { setEditing(p); setFormOpen(true) }
   const onSaved = () => { setFormOpen(false); setRefreshKey((k) => k + 1) }
 
+  // Real stats computed from live data
+  const { data: pkgs = [] } = useApi(() => packagesApi.list(), [refreshKey])
+  const { data: subs = [] } = useApi(() => packagesApi.listSubscriptions(), [refreshKey])
+  const pkgList = pkgs || []
+  const subList = subs || []
+  const activeSubs = subList.filter((s) => s.status === 'نشطة')
+  const now = new Date()
+  const endingSoon = activeSubs.filter((s) => {
+    if (s.end_date) {
+      const days = (new Date(s.end_date) - now) / 86400000
+      if (days >= 0 && days <= 30) return true
+    }
+    if (typeof s.sessions_remaining === 'number' && s.sessions_total !== 999 && s.sessions_remaining <= 3) return true
+    return false
+  })
+  const monthRevenue = subList.reduce((sum, s) => {
+    if (!s.start_date) return sum
+    const d = new Date(s.start_date)
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+      ? sum + (s.price_paid || 0)
+      : sum
+  }, 0)
+  const stats = [
+    { v: toArabicDigits(pkgList.length), l: 'قوالب الباقات', t: 'text-brand' },
+    { v: toArabicDigits(activeSubs.length), l: 'اشتراكات نشطة', t: 'text-emerald-600' },
+    { v: toArabicDigits(endingSoon.length), l: 'تنتهي قريباً', t: 'text-amber-600' },
+    { v: formatNumberAr(Math.round(monthRevenue)), l: 'إيراد الشهر (ر.س)', t: 'text-indigo-600' }
+  ]
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -45,12 +74,7 @@ export default function Packages() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { v: '٤', l: 'قوالب الباقات', t: 'text-brand' },
-          { v: '١٣٧', l: 'اشتراكات نشطة', t: 'text-emerald-600' },
-          { v: '٢١', l: 'تنتهي قريباً', t: 'text-amber-600' },
-          { v: '١٨٧K', l: 'إيراد الشهر (ر.س)', t: 'text-indigo-600' }
-        ].map((s) => (
+        {stats.map((s) => (
           <div key={s.l} className="card p-4">
             <div className={cn('text-2xl font-extrabold tabular', s.t)}>{s.v}</div>
             <div className="text-[10px] text-ink-tertiary font-bold mt-0.5">{s.l}</div>
