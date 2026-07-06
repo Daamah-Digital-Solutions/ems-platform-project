@@ -46,7 +46,18 @@ class Studio(Base):
     ramadan_mode: Mapped[bool] = mapped_column(Boolean, default=True)
     block_prayer: Mapped[bool] = mapped_column(Boolean, default=True)
     prayer_buffer_min: Mapped[int] = mapped_column(Integer, default=10)
+    # Per-studio payment gateway config. Each studio uses its OWN credentials so
+    # funds go directly to its own account. gateway: "moyasar" (default) | "tap".
+    payment_gateway: Mapped[str] = mapped_column(String(20), default="moyasar")
+    payments_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    moyasar_secret_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    moyasar_publishable_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    @property
+    def moyasar_secret_set(self) -> bool:
+        """Whether a secret key is stored — surfaced to the UI without leaking it."""
+        return bool(self.moyasar_secret_key)
 
 
 

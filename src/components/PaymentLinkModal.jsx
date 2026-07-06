@@ -112,7 +112,7 @@ export default function PaymentLinkModal({ open, onClose, fixedClient, fixedPack
             <input type="number" className="input tabular" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="السعر الافتراضي للباقة" />
           </div>
           <p className="text-xs text-ink-tertiary">
-            هيتولّد رابط دفع من Tap — العميل يفتحه ويختار طريقة الدفع (mada / بطاقة / Apple Pay / تابي / تمارا حسب المُفعّل).
+            هيتولّد رابط دفع عبر ميسر — العميل يفتحه ويختار طريقة الدفع (مدى / بطاقة / Apple Pay / تابي / تمارا حسب المُفعّل في حساب ميسر).
           </p>
         </div>
       ) : (

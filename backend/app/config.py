@@ -17,7 +17,10 @@ class Settings(BaseSettings):
     public_api_key: str = "dev-public-key-change-me"
     public_studio_id: int = 1
 
-    # Tap payment gateway
+    # Moyasar payment gateway (per-studio keys are stored on the Studio row)
+    moyasar_base_url: str = "https://api.moyasar.com/v1"
+
+    # Tap payment gateway (fallback; global key)
     tap_secret_key: str = ""
     tap_public_key: str = ""
     tap_base_url: str = "https://api.tap.company/v2"

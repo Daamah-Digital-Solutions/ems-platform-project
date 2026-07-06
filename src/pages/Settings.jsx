@@ -14,7 +14,9 @@ import {
   Phone,
   Mail,
   Globe,
-  Save
+  Save,
+  CreditCard,
+  AlertTriangle
 } from 'lucide-react'
 import { studioApi, getStoredStudio } from '../lib/api.js'
 import { useApi } from '../lib/useApi.js'
@@ -26,6 +28,7 @@ const TABS = [
   { k: 'studio', l: 'معلومات الستوديو', i: Building2 },
   { k: 'hours', l: 'ساعات العمل', i: Clock },
   { k: 'prayer', l: 'أوقات الصلاة', i: Sun },
+  { k: 'payments', l: 'الدفع', i: CreditCard },
   // Other tabs (branches, team, pricing, security, notifications, billing) are temporarily hidden.
 ]
 
@@ -70,6 +73,7 @@ export default function Settings() {
           {tab === 'studio' && <StudioInfo />}
           {tab === 'hours' && <WorkingHours />}
           {tab === 'prayer' && <PrayerSettings />}
+          {tab === 'payments' && <PaymentSettings />}
           {tab === 'branches' && <BranchesPlaceholder />}
           {tab === 'team' && <TeamPlaceholder />}
           {tab === 'pricing' && <PricingPlaceholder />}
@@ -329,6 +333,108 @@ function PrayerSettings() {
       <div className="flex justify-end pt-2">
         <button onClick={save} disabled={saving} className="btn-primary">
           {saving ? 'جاري الحفظ...' : 'حفظ إعدادات الصلاة'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PaymentSettings() {
+  const { data: studio, reload } = useApi(() => studioApi.get())
+  const [pub, setPub] = useState(null)
+  const [secret, setSecret] = useState('')
+  const [enabled, setEnabled] = useState(null)
+  const [seeded, setSeeded] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  if (studio && !seeded) {
+    setSeeded(true)
+    setPub(studio.moyasar_publishable_key || '')
+    setEnabled(studio.payments_enabled ?? false)
+  }
+  const publishable = pub ?? ''
+  const isEnabled = enabled ?? false
+  const secretSet = !!studio?.moyasar_secret_set
+  const live = isEnabled && (secretSet || secret.trim())
+
+  async function save() {
+    setSaving(true)
+    try {
+      const patch = {
+        payment_gateway: 'moyasar',
+        payments_enabled: isEnabled,
+        moyasar_publishable_key: publishable.trim() || null,
+      }
+      if (secret.trim()) patch.moyasar_secret_key = secret.trim() // only send when changed
+      await studioApi.update(patch)
+      setSecret('')
+      toast('تم حفظ إعدادات الدفع', 'success')
+      reload()
+    } catch (e) {
+      toast(e.message || 'فشل الحفظ', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="card p-5 sm:p-7 space-y-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold">بوابة الدفع — ميسر (Moyasar)</h2>
+          <p className="text-sm text-ink-tertiary mt-1">
+            اربط حساب ميسر الخاص بستوديوهك. المدفوعات تروح لحسابك مباشرة.
+          </p>
+        </div>
+        <span className={cn('px-2.5 py-1 rounded-full text-xs font-extrabold whitespace-nowrap',
+          live ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600')}>
+          {live ? '● مفعّل' : 'غير مفعّل'}
+        </span>
+      </div>
+
+      <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs leading-relaxed">
+        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>
+          احصل على المفاتيح من لوحة تحكم ميسر (moyasar.com) ← Settings ← API Keys. استخدم مفاتيح
+          <strong> Test</strong> (تبدأ بـ <span className="ltr">pk_test / sk_test</span>) للتجربة، ثم مفاتيح
+          <strong> Live</strong> للتشغيل الفعلي.
+        </span>
+      </div>
+
+      <div>
+        <label className="label">مفتاح النشر (Publishable Key)</label>
+        <input
+          className="input ltr text-right"
+          dir="ltr"
+          value={publishable}
+          onChange={(e) => setPub(e.target.value)}
+          placeholder="pk_test_..."
+        />
+      </div>
+
+      <div>
+        <label className="label">المفتاح السري (Secret Key)</label>
+        <input
+          type="password"
+          className="input ltr text-right"
+          dir="ltr"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder={secretSet ? '•••••••• (مضبوط — اتركه فارغًا للإبقاء عليه)' : 'sk_test_...'}
+        />
+        <p className="text-[11px] text-ink-tertiary mt-1.5">المفتاح السري محفوظ بأمان ولا يظهر بعد الحفظ.</p>
+      </div>
+
+      <ToggleRow
+        title="تفعيل استقبال المدفوعات"
+        sub="لازم يكون المفتاح السري مضبوطًا حتى تعمل روابط الدفع"
+        on={isEnabled}
+        onToggle={() => setEnabled(!isEnabled)}
+      />
+
+      <div className="flex justify-end pt-2 border-t border-border/60">
+        <button onClick={save} disabled={saving} className="btn-primary">
+          <Save className="w-4 h-4" /> {saving ? 'جاري الحفظ...' : 'حفظ إعدادات الدفع'}
         </button>
       </div>
     </div>
