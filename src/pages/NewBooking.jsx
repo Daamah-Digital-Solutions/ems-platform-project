@@ -69,7 +69,8 @@ export default function NewBooking() {
   const [data, setData] = useState(() => {
     // Carry over the day (and optionally the hour) chosen on the bookings calendar.
     const todayISO = toISODate(new Date())
-    const validDate = preDate && /^\d{4}-\d{2}-\d{2}$/.test(preDate) && preDate >= todayISO ? preDate : todayISO
+    // Past days are allowed (so staff can log old/historical sessions).
+    const validDate = preDate && /^\d{4}-\d{2}-\d{2}$/.test(preDate) ? preDate : todayISO
     const validTime = preTime && /^\d{1,2}:\d{2}$/.test(preTime)
     return {
       client: null,
@@ -353,7 +354,6 @@ function StepTime({ data, set }) {
         <input
           type="date"
           value={data.date}
-          min={toISODate(new Date())}
           onChange={(e) => { if (e.target.value) set({ date: e.target.value }) }}
           className="input tabular"
           style={{ width: 'auto', minHeight: 42, paddingInline: 14 }}
@@ -418,7 +418,8 @@ function StepTime({ data, set }) {
             return bs.getHours() === h && bs.getMinutes() === mi
           }).length
           const full = capacity > 0 && busyCount >= capacity
-          const disabled = past || prayerHit || full
+          // Past times stay selectable so staff can log old sessions.
+          const disabled = prayerHit || full
           const selected = slots.some((s) => s.date === data.date && s.time === t)
           return (
             <button
@@ -438,7 +439,7 @@ function StepTime({ data, set }) {
               <span>{fmtTime12Ar(t)}</span>
               {prayerHit && <span className="text-[8px] font-bold text-amber-600">صلاة</span>}
               {!prayerHit && full && <span className="text-[8px] font-bold text-ink-tertiary">محجوز</span>}
-              {!prayerHit && !full && past && <span className="text-[8px] font-bold text-ink-tertiary">انتهى</span>}
+              {!prayerHit && !full && past && !selected && <span className="text-[8px] font-bold text-ink-tertiary">سابق</span>}
             </button>
           )
         })}
