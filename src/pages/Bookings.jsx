@@ -404,6 +404,12 @@ function BookingDetailModal({ booking, onClose, onChanged }) {
             ))}
           </div>
 
+          {b.client_id && (
+            <Link to={`/clients/${b.client_id}`} onClick={onClose} className="btn-secondary w-full justify-center">
+              <User className="w-4 h-4" /> ملف العميل الكامل
+            </Link>
+          )}
+
           {canceled ? (
             <div className="p-3 rounded-lg bg-gray-50 border border-border text-ink-secondary text-sm font-bold text-center">هذا الحجز ملغى.</div>
           ) : confirmCancel ? (
