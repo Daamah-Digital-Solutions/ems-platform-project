@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { ChevronRight, ChevronLeft, Plus, Calendar as CalIcon } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Plus, Calendar as CalIcon, Check, X, Ban, Clock, User, Cpu } from 'lucide-react'
 import { bookingsApi, resourcesApi } from '../lib/api.js'
 import { useApi } from '../lib/useApi.js'
 import { cn, toArabicDigits } from '../lib/utils.js'
+import Modal from '../components/Modal.jsx'
+import { toast } from '../lib/toast.js'
 
 function statusColor(status) {
   switch (status) {
@@ -58,10 +60,11 @@ export default function Bookings() {
   }
 
   const rangeKey = `${view}_${ymd(rangeStart)}`
-  const { data: bookings = [], loading } = useApi(
+  const { data: bookings = [], loading, reload } = useApi(
     () => bookingsApi.list({ start: naive(rangeStart), end: naive(rangeEnd) }),
     [rangeKey]
   )
+  const [selected, setSelected] = useState(null)
   const { data: machines = [] } = useApi(() => resourcesApi.listMachines())
   const list = (bookings || []).map((b) => ({ ...b, _d: new Date(b.start_time) }))
   const machinesList = machines || []
@@ -145,9 +148,11 @@ export default function Bookings() {
 
       {loading && <div className="card p-12 text-center text-ink-tertiary font-bold">جاري التحميل...</div>}
 
-      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} dateISO={ymd(current)} />}
-      {!loading && view === 'week' && <WeekView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} />}
+      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} dateISO={ymd(current)} onSelect={setSelected} />}
+      {!loading && view === 'week' && <WeekView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} onSelect={setSelected} />}
       {!loading && view === 'month' && <MonthView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} />}
+
+      <BookingDetailModal booking={selected} onClose={() => setSelected(null)} onChanged={reload} />
 
       {/* Legend */}
       <div className="card p-4 flex flex-wrap items-center gap-4 text-xs">
@@ -168,7 +173,7 @@ export default function Bookings() {
   )
 }
 
-function DayView({ bookings, machines, dateISO }) {
+function DayView({ bookings, machines, dateISO, onSelect }) {
   const cols = machines.length || 1
   const gridCols = `80px repeat(${cols}, minmax(120px, 1fr))`
 
@@ -219,14 +224,14 @@ function DayView({ bookings, machines, dateISO }) {
                           {cell.map((b) => {
                             const s = statusColor(b.status)
                             return (
-                              <div key={b.id} className={cn('rounded-lg p-2 border', s.bg, s.text)}>
+                              <button key={b.id} onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-2 border transition-transform hover:-translate-y-0.5 hover:shadow-card', s.bg, s.text)}>
                                 <div className="flex items-center gap-1.5 mb-1">
                                   <span className={cn('w-1.5 h-1.5 rounded-full', s.dot)} />
                                   <span className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</span>
                                 </div>
                                 <div className="font-extrabold text-xs truncate">{b.client_name}</div>
                                 <div className="text-[10px] opacity-75 truncate">{b.trainer_name}</div>
-                              </div>
+                              </button>
                             )
                           })}
                         </div>
@@ -252,7 +257,7 @@ function DayView({ bookings, machines, dateISO }) {
   )
 }
 
-function WeekView({ bookings, current, onPickDay }) {
+function WeekView({ bookings, current, onPickDay, onSelect }) {
   const weekStart = startOfWeek(current)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   return (
@@ -278,10 +283,10 @@ function WeekView({ bookings, current, onPickDay }) {
                 {dayBookings.map((b) => {
                   const s = statusColor(b.status)
                   return (
-                    <div key={b.id} className={cn('rounded-lg p-1.5 border', s.bg, s.text)}>
+                    <button key={b.id} onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-1.5 border hover:shadow-card', s.bg, s.text)}>
                       <div className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</div>
                       <div className="font-extrabold text-[11px] truncate">{b.client_name}</div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -332,5 +337,98 @@ function MonthView({ bookings, current, onPickDay }) {
         })}
       </div>
     </div>
+  )
+}
+
+function BookingDetailModal({ booking, onClose, onChanged }) {
+  const [busy, setBusy] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const b = booking
+
+  async function act(fn, okMsg) {
+    setBusy(true)
+    try {
+      await fn()
+      toast(okMsg, 'success')
+      onChanged?.()
+      onClose()
+    } catch (e) {
+      toast(e.message || 'تعذّر تنفيذ العملية', 'error')
+    } finally {
+      setBusy(false)
+      setConfirmCancel(false)
+    }
+  }
+
+  const canceled = b?.status === 'ملغي'
+  const rows = b ? [
+    { i: User, l: 'العميل', v: b.client_name },
+    { i: User, l: 'المدرب', v: b.trainer_name },
+    { i: Cpu, l: 'الجهاز', v: b.machine_label },
+    { i: Clock, l: 'الموعد', v: `${fmtFull(new Date(b.start_time))} — ${fmtTime(new Date(b.start_time))}` },
+  ] : []
+
+  return (
+    <Modal
+      open={!!b}
+      onClose={onClose}
+      title="تفاصيل الحجز"
+      footer={
+        confirmCancel ? (
+          <>
+            <button onClick={() => setConfirmCancel(false)} className="btn-secondary flex-1" disabled={busy}>تراجع</button>
+            <button onClick={() => act(() => bookingsApi.cancel(b.id), 'تم إلغاء الحجز')} className="btn-danger flex-1" disabled={busy}>
+              {busy ? 'جاري الإلغاء...' : 'تأكيد الإلغاء'}
+            </button>
+          </>
+        ) : (
+          <button onClick={onClose} className="btn-secondary flex-1">إغلاق</button>
+        )
+      }
+    >
+      {b && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-ink-secondary font-bold">الحالة</span>
+            <span className={cn('px-2.5 py-1 rounded-full text-xs font-extrabold', statusColor(b.status).bg, statusColor(b.status).text)}>
+              {b.status}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {rows.map((r) => (
+              <div key={r.l} className="flex items-center gap-3 p-3 rounded-xl bg-bg/50 border border-border/40">
+                <span className="w-8 h-8 rounded-lg bg-white text-brand flex items-center justify-center shadow-sm"><r.i className="w-4 h-4" /></span>
+                <span className="text-sm text-ink-secondary font-bold flex-1">{r.l}</span>
+                <span className="font-extrabold text-ink-primary text-sm">{r.v || '—'}</span>
+              </div>
+            ))}
+          </div>
+
+          {canceled ? (
+            <div className="p-3 rounded-lg bg-gray-50 border border-border text-ink-secondary text-sm font-bold text-center">هذا الحجز ملغى.</div>
+          ) : confirmCancel ? (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm font-bold">
+              متأكد من إلغاء حجز {b.client_name}؟ هيتحوّل لحالة "ملغي".
+            </div>
+          ) : (
+            <div className="grid gap-2 pt-1">
+              {b.status !== 'مكتمل' && (
+                <button disabled={busy} onClick={() => act(() => bookingsApi.update(b.id, { status: 'مكتمل' }), 'تم تعليم الحجز كمكتمل')} className="btn bg-emerald-500 text-white hover:bg-emerald-600 justify-center">
+                  <Check className="w-4 h-4" /> تم الحضور (مكتمل)
+                </button>
+              )}
+              {b.status !== 'لم يحضر' && (
+                <button disabled={busy} onClick={() => act(() => bookingsApi.update(b.id, { status: 'لم يحضر' }), 'تم تعليم عدم الحضور')} className="btn-secondary justify-center">
+                  <X className="w-4 h-4" /> لم يحضر
+                </button>
+              )}
+              <button disabled={busy} onClick={() => setConfirmCancel(true)} className="btn text-red-600 hover:bg-red-50 justify-center">
+                <Ban className="w-4 h-4" /> إلغاء الحجز
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   )
 }
