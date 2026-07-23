@@ -89,7 +89,8 @@ export function updateStoredUser(user) {
 // ============ Studio ============
 export const studioApi = {
   get: () => request('/api/studio'),
-  update: (patch) => request('/api/studio', { method: 'PATCH', body: patch })
+  update: (patch) => request('/api/studio', { method: 'PATCH', body: patch }),
+  paymentGateways: () => request('/api/studio/payment-gateways')
 }
 
 // ============ Clients ============

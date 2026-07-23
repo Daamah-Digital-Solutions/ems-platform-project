@@ -15,7 +15,7 @@ from sqlalchemy import select
 from .. import models, schemas
 from ..deps import DB, CurrentUser, StudioId
 from ..config import settings
-from ..services import tap, moyasar
+from ..services import tap, moyasar, gateways
 from .packages import create_subscription_for
 
 
@@ -68,9 +68,10 @@ def _sync_payment(db, p: models.Payment) -> str:
     """Re-fetch the invoice/charge from the gateway and update the payment."""
     if p.gateway == "moyasar":
         studio = db.get(models.Studio, p.studio_id)
-        if not studio or not studio.moyasar_secret_key:
+        secret = gateways.studio_creds(studio, "moyasar").get("secret_key") if studio else None
+        if not secret:
             return p.status
-        inv = moyasar.get_invoice(secret_key=studio.moyasar_secret_key, invoice_id=p.charge_id)
+        inv = moyasar.get_invoice(secret_key=secret, invoice_id=p.charge_id)
         status = (inv.get("status") or "").lower()
         pays = inv.get("payments") or []
         if pays:
@@ -105,12 +106,15 @@ def create_payment(payload: schemas.PaymentCreate, db: DB, user: CurrentUser):
         raise HTTPException(400, "الباقة غير موجودة")
 
     gateway = (studio.payment_gateway or "moyasar")
+    moyasar_secret = gateways.studio_creds(studio, "moyasar").get("secret_key")
     if gateway == "moyasar":
-        if not studio.payments_enabled or not studio.moyasar_secret_key:
+        if not studio.payments_enabled or not moyasar_secret:
             raise HTTPException(400, "الدفع غير مفعّل. فعّل بوابة الدفع (ميسر) من الإعدادات.")
     elif gateway == "tap":
         if not settings.tap_secret_key:
             raise HTTPException(400, "لم يتم ضبط مفتاح بوابة الدفع (Tap)")
+    elif gateway == "alrajhi":
+        raise HTTPException(400, "بوابة الراجحي قيد التجهيز — بانتظار دليل التكامل. اختر ميسر مؤقتًا.")
     else:
         raise HTTPException(400, "بوابة دفع غير مدعومة")
 
@@ -128,7 +132,7 @@ def create_payment(payload: schemas.PaymentCreate, db: DB, user: CurrentUser):
         meta = {"payment_id": str(p.id), "client_id": str(client.id), "package_id": str(pkg.id)}
         if gateway == "moyasar":
             inv = moyasar.create_invoice(
-                secret_key=studio.moyasar_secret_key,
+                secret_key=moyasar_secret,
                 amount=amount,
                 currency="SAR",
                 description=f"{pkg.name_ar} — {client.name_ar}",

@@ -61,11 +61,10 @@ class StudioOut(BaseModel):
     ramadan_mode: bool
     block_prayer: bool
     prayer_buffer_min: int
-    # Payments (secret key is never returned — only whether one is set)
+    # Payments (secret values are never returned — only masked flags)
     payment_gateway: str = "moyasar"
     payments_enabled: bool = False
-    moyasar_publishable_key: Optional[str] = None
-    moyasar_secret_set: bool = False
+    payment_config_masked: dict = {}
 
 
 class StudioUpdate(BaseModel):
@@ -81,11 +80,10 @@ class StudioUpdate(BaseModel):
     block_prayer: Optional[bool] = None
     prayer_buffer_min: Optional[int] = None
     working_hours: Optional[dict] = None
-    # Payments
+    # Payments — per-gateway credentials merged into payment_config
     payment_gateway: Optional[str] = None
     payments_enabled: Optional[bool] = None
-    moyasar_secret_key: Optional[str] = None
-    moyasar_publishable_key: Optional[str] = None
+    payment_config: Optional[dict] = None
 
 
 # -------- User --------

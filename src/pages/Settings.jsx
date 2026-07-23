@@ -341,33 +341,58 @@ function PrayerSettings() {
 
 function PaymentSettings() {
   const { data: studio, reload } = useApi(() => studioApi.get())
-  const [pub, setPub] = useState(null)
-  const [secret, setSecret] = useState('')
+  const { data: catalog } = useApi(() => studioApi.paymentGateways())
+  const [gateway, setGateway] = useState(null)
   const [enabled, setEnabled] = useState(null)
+  const [vals, setVals] = useState({})
   const [seeded, setSeeded] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  if (studio && !seeded) {
+  if (studio && catalog && !seeded) {
     setSeeded(true)
-    setPub(studio.moyasar_publishable_key || '')
+    setGateway(studio.payment_gateway || 'moyasar')
     setEnabled(studio.payments_enabled ?? false)
+    const masked = studio.payment_config_masked || {}
+    const init = {}
+    Object.keys(catalog).forEach((g) => {
+      init[g] = {}
+      ;(catalog[g].fields || []).forEach((f) => {
+        if (!f.secret) init[g][f.key] = (masked[g] || {})[f.key] || ''
+      })
+    })
+    setVals(init)
   }
-  const publishable = pub ?? ''
+
+  if (!catalog || !studio) {
+    return <div className="card p-10 text-center text-ink-tertiary font-bold">جاري التحميل...</div>
+  }
+
+  const gw = gateway || 'moyasar'
+  const def = catalog[gw] || { fields: [] }
+  const masked = (studio.payment_config_masked || {})[gw] || {}
   const isEnabled = enabled ?? false
-  const secretSet = !!studio?.moyasar_secret_set
-  const live = isEnabled && (secretSet || secret.trim())
+  const setField = (key, v) => setVals((s) => ({ ...s, [gw]: { ...(s[gw] || {}), [key]: v } }))
+  const credsReady = def.global ||
+    (def.fields || []).some((f) => f.secret && (masked[`${f.key}_set`] || (vals[gw] || {})[f.key]))
+  const live = isEnabled && def.ready && credsReady
 
   async function save() {
     setSaving(true)
     try {
-      const patch = {
-        payment_gateway: 'moyasar',
-        payments_enabled: isEnabled,
-        moyasar_publishable_key: publishable.trim() || null,
-      }
-      if (secret.trim()) patch.moyasar_secret_key = secret.trim() // only send when changed
+      const cfg = {}
+      ;(def.fields || []).forEach((f) => {
+        const v = ((vals[gw] || {})[f.key] || '').trim()
+        if (f.secret) { if (v) cfg[f.key] = v }        // send secret only when typed
+        else cfg[f.key] = v || null
+      })
+      const patch = { payment_gateway: gw, payments_enabled: isEnabled }
+      if (Object.keys(cfg).length) patch.payment_config = { [gw]: cfg }
       await studioApi.update(patch)
-      setSecret('')
+      setVals((s) => {
+        const copy = { ...s, [gw]: { ...(s[gw] || {}) } }
+        ;(def.fields || []).forEach((f) => { if (f.secret) copy[gw][f.key] = '' })
+        return copy
+      })
       toast('تم حفظ إعدادات الدفع', 'success')
       reload()
     } catch (e) {
@@ -381,10 +406,8 @@ function PaymentSettings() {
     <div className="card p-5 sm:p-7 space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-extrabold">بوابة الدفع — ميسر (Moyasar)</h2>
-          <p className="text-sm text-ink-tertiary mt-1">
-            اربط حساب ميسر الخاص بستوديوهك. المدفوعات تروح لحسابك مباشرة.
-          </p>
+          <h2 className="text-lg font-extrabold">بوابة الدفع</h2>
+          <p className="text-sm text-ink-tertiary mt-1">اختر البوابة واربط حساب ستوديوهك — المدفوعات تروح لحسابك مباشرة.</p>
         </div>
         <span className={cn('px-2.5 py-1 rounded-full text-xs font-extrabold whitespace-nowrap',
           live ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600')}>
@@ -392,42 +415,65 @@ function PaymentSettings() {
         </span>
       </div>
 
-      <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs leading-relaxed">
-        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        <span>
-          احصل على المفاتيح من لوحة تحكم ميسر (moyasar.com) ← Settings ← API Keys. استخدم مفاتيح
-          <strong> Test</strong> (تبدأ بـ <span className="ltr">pk_test / sk_test</span>) للتجربة، ثم مفاتيح
-          <strong> Live</strong> للتشغيل الفعلي.
-        </span>
+      {/* Gateway selector */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {Object.keys(catalog).map((g) => {
+          const c = catalog[g]
+          const on = g === gw
+          return (
+            <button
+              key={g}
+              onClick={() => setGateway(g)}
+              className={cn('rounded-xl border-2 p-3 text-right transition-all',
+                on ? 'border-brand bg-brand-50/50' : 'border-border bg-white hover:border-brand-200')}
+            >
+              <div className="font-extrabold text-sm text-ink-primary">{c.label}</div>
+              <div className="mt-1">
+                {c.ready
+                  ? <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">متاح</span>
+                  : <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">قريبًا</span>}
+              </div>
+            </button>
+          )
+        })}
       </div>
 
-      <div>
-        <label className="label">مفتاح النشر (Publishable Key)</label>
-        <input
-          className="input ltr text-right"
-          dir="ltr"
-          value={publishable}
-          onChange={(e) => setPub(e.target.value)}
-          placeholder="pk_test_..."
-        />
-      </div>
+      {!def.ready && def.note && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed font-bold">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{def.note}</span>
+        </div>
+      )}
+      {def.global && (
+        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold">
+          هذه البوابة تستخدم مفتاح السيرفر العام — لا تحتاج بيانات هنا.
+        </div>
+      )}
+      {gw === 'moyasar' && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs leading-relaxed">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>المفاتيح من لوحة ميسر (moyasar.com) ← Settings ← API Keys. جرّب بمفاتيح <span className="ltr">Test</span> ثم بدّل لـ <span className="ltr">Live</span>.</span>
+        </div>
+      )}
 
-      <div>
-        <label className="label">المفتاح السري (Secret Key)</label>
-        <input
-          type="password"
-          className="input ltr text-right"
-          dir="ltr"
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          placeholder={secretSet ? '•••••••• (مضبوط — اتركه فارغًا للإبقاء عليه)' : 'sk_test_...'}
-        />
-        <p className="text-[11px] text-ink-tertiary mt-1.5">المفتاح السري محفوظ بأمان ولا يظهر بعد الحفظ.</p>
-      </div>
+      {(def.fields || []).map((f) => (
+        <div key={f.key}>
+          <label className="label">{f.label}</label>
+          <input
+            type={f.secret ? 'password' : 'text'}
+            className="input ltr text-right"
+            dir="ltr"
+            value={(vals[gw] || {})[f.key] || ''}
+            onChange={(e) => setField(f.key, e.target.value)}
+            placeholder={f.secret && masked[`${f.key}_set`] ? '•••••••• (مضبوط — اتركه فارغًا للإبقاء عليه)' : (f.placeholder || '')}
+          />
+          {f.secret && <p className="text-[11px] text-ink-tertiary mt-1.5">محفوظ بأمان ولا يظهر بعد الحفظ.</p>}
+        </div>
+      ))}
 
       <ToggleRow
         title="تفعيل استقبال المدفوعات"
-        sub="لازم يكون المفتاح السري مضبوطًا حتى تعمل روابط الدفع"
+        sub="لازم تكون بيانات البوابة مضبوطة والبوابة متاحة حتى تعمل روابط الدفع"
         on={isEnabled}
         onToggle={() => setEnabled(!isEnabled)}
       />

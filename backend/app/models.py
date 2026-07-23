@@ -50,14 +50,44 @@ class Studio(Base):
     # funds go directly to its own account. gateway: "moyasar" (default) | "tap".
     payment_gateway: Mapped[str] = mapped_column(String(20), default="moyasar")
     payments_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Legacy single-gateway columns (kept for backward-compat / fallback reads).
     moyasar_secret_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
     moyasar_publishable_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Flexible per-gateway credential store → {"moyasar":{...},"alrajhi":{...}}.
+    # New gateways plug in here without a DB migration each time.
+    payment_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     @property
     def moyasar_secret_set(self) -> bool:
-        """Whether a secret key is stored — surfaced to the UI without leaking it."""
-        return bool(self.moyasar_secret_key)
+        return bool(self.moyasar_secret_key) or bool((self.payment_config or {}).get("moyasar", {}).get("secret_key"))
+
+    @property
+    def payment_config_masked(self) -> dict:
+        """Per-gateway config for the UI: secret values replaced by a '<key>_set' flag."""
+        merged = dict(self.payment_config or {})
+        # fold legacy moyasar columns into the view
+        mo = dict(merged.get("moyasar") or {})
+        if self.moyasar_publishable_key and not mo.get("publishable_key"):
+            mo["publishable_key"] = self.moyasar_publishable_key
+        if self.moyasar_secret_key and not mo.get("secret_key"):
+            mo["secret_key"] = self.moyasar_secret_key
+        if mo:
+            merged["moyasar"] = mo
+        out = {}
+        for gw, fields in merged.items():
+            d = {}
+            for k, v in (fields or {}).items():
+                if k in SECRET_FIELD_KEYS:
+                    d[f"{k}_set"] = bool(v)
+                else:
+                    d[k] = v
+            out[gw] = d
+        return out
+
+
+# Credential field names that must never be returned to the client.
+SECRET_FIELD_KEYS = {"secret_key", "api_password", "password", "secret"}
 
 
 
