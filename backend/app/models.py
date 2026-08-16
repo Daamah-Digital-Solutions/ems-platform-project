@@ -327,3 +327,31 @@ class Payment(Base):
     subscription_id: Mapped[int | None] = mapped_column(ForeignKey("subscriptions.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ----------- Manual payment / invoice (recorded by staff) -----------
+class ManualPayment(Base):
+    """A payment logged manually by staff (cash/POS/transfer), with an optional
+    invoice attached as an image or file. Independent of the online gateways —
+    this is the studio's money ledger for computing per-client and monthly totals.
+    """
+    __tablename__ = "manual_payments"
+    __table_args__ = (
+        Index("ix_manualpay_studio_date", "studio_id", "paid_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    studio_id: Mapped[int] = mapped_column(ForeignKey("studios.id"), index=True)
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
+    client_name: Mapped[str] = mapped_column(String(160))  # snapshot / free text for walk-ins
+    amount: Mapped[float] = mapped_column(Float)
+    currency: Mapped[str] = mapped_column(String(3), default="SAR")
+    kind: Mapped[str] = mapped_column(String(30), default="اشتراك")  # اشتراك / جلسة تجريبية / أخرى
+    method: Mapped[str | None] = mapped_column(String(30), nullable=True)  # نقدًا / شبكة / تحويل / أخرى
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attachment_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    attachment_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    attachment_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    paid_at: Mapped[date] = mapped_column(Date, default=date.today, index=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

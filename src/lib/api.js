@@ -37,7 +37,9 @@ async function request(path, { method = 'GET', body, params, auth = true } = {})
     const q = qs.toString()
     if (q) url += '?' + q
   }
-  const headers = { 'Content-Type': 'application/json' }
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
+  const headers = {}
+  if (!isForm) headers['Content-Type'] = 'application/json'
   if (auth) {
     const t = getToken()
     if (t) headers.Authorization = `Bearer ${t}`
@@ -45,7 +47,7 @@ async function request(path, { method = 'GET', body, params, auth = true } = {})
   const res = await fetch(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined
+    body: isForm ? body : body ? JSON.stringify(body) : undefined
   })
   if (res.status === 401) {
     clearSession()
@@ -163,4 +165,20 @@ export const paymentsApi = {
   get: (id) => request(`/api/payments/${id}`),
   create: (data) => request('/api/payments', { method: 'POST', body: data }),
   refresh: (id) => request(`/api/payments/${id}/refresh`, { method: 'POST' })
+}
+
+// ============ Manual payments / invoices ============
+export const manualPaymentsApi = {
+  list: (params) => request('/api/manual-payments', { params }),
+  summary: (params) => request('/api/manual-payments/summary', { params }),
+  create: (formData) => request('/api/manual-payments', { method: 'POST', body: formData }),
+  remove: (id) => request(`/api/manual-payments/${id}`, { method: 'DELETE' })
+}
+
+// Fetch a protected file (invoice attachment) with auth → Blob (for viewing/download).
+export async function fetchBlob(path) {
+  const t = getToken()
+  const res = await fetch(API_BASE + path, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+  if (!res.ok) throw new Error('تعذّر تحميل الملف')
+  return res.blob()
 }

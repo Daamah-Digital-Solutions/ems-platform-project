@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import Base, engine
 from . import models  # noqa: F401  (register models)
-from .routers import auth, clients, trainers, resources, packages, bookings, reports, studios, invoices, public, leads, payments
+from .routers import auth, clients, trainers, resources, packages, bookings, reports, studios, invoices, public, leads, payments, manual_payments
 from .seed import ensure_seed
 
 
@@ -46,6 +46,7 @@ app.include_router(invoices.router)
 app.include_router(public.router)
 app.include_router(leads.router)
 app.include_router(payments.router)
+app.include_router(manual_payments.router)
 
 
 @app.get("/")

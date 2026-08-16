@@ -28,6 +28,9 @@ services:
       TAP_SECRET_KEY: ${TAP_SECRET_KEY:-}
       TAP_PUBLIC_KEY: ${TAP_PUBLIC_KEY:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://crm.emselriyadh.com}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -52,3 +55,4 @@ volumes:
   dbdata:
   caddydata:
   caddyconfig:
+  uploads:

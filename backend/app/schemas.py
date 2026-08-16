@@ -473,3 +473,28 @@ class PaymentOut(BaseModel):
     client_name: Optional[str] = None
     client_phone: Optional[str] = None
     package_name: Optional[str] = None
+
+
+# -------- Manual payments / invoices --------
+class ManualPaymentOut(BaseModel):
+    model_config = _config()
+    id: int
+    client_id: Optional[int] = None
+    client_name: str
+    amount: float
+    currency: str
+    kind: str
+    method: Optional[str] = None
+    note: Optional[str] = None
+    paid_at: date
+    has_attachment: bool = False
+    attachment_name: Optional[str] = None
+    attachment_type: Optional[str] = None
+    created_at: datetime
+
+
+class ManualPaymentSummary(BaseModel):
+    month: str          # YYYY-MM
+    total: float
+    count: int
+    by_kind: dict       # { kind: total }

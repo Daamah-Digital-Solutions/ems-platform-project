@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Public base URL used to build payment redirect/webhook callbacks
     public_base_url: str = "http://localhost:8001"
 
+    # Uploaded files (manual invoice attachments). In Docker this is a mounted volume.
+    upload_dir: str = "uploads"
+    max_upload_mb: int = 10
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
