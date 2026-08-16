@@ -59,9 +59,7 @@ export default function Payments() {
           <p className="page-subtitle">سجّل مدفوعات العملاء وفواتيرهم — والإجمالي يُحسب تلقائيًا شهريًا.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setLinkOpen(true)} className="btn-secondary btn-sm">
-            <CreditCard className="w-4 h-4" /> رابط دفع أونلاين
-          </button>
+          {/* Online payment link temporarily hidden */}
           <button onClick={() => setRecordOpen(true)} className="btn-primary btn-sm">
             <Plus className="w-4 h-4" /> تسجيل دفعة
           </button>

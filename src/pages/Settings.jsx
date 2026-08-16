@@ -28,7 +28,7 @@ const TABS = [
   { k: 'studio', l: 'معلومات الستوديو', i: Building2 },
   { k: 'hours', l: 'ساعات العمل', i: Clock },
   { k: 'prayer', l: 'أوقات الصلاة', i: Sun },
-  { k: 'payments', l: 'الدفع', i: CreditCard },
+  // 'الدفع' (online gateway) tab temporarily hidden.
   // Other tabs (branches, team, pricing, security, notifications, billing) are temporarily hidden.
 ]
 

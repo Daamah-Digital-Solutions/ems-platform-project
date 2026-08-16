@@ -210,9 +210,7 @@ export default function ClientDetail() {
             <button onClick={() => setRecordOpen(true)} className="btn bg-emerald-600 text-white hover:bg-emerald-700 btn-sm">
               <Receipt className="w-3.5 h-3.5" /> تسجيل دفعة
             </button>
-            <button onClick={() => setPayOpen(true)} className="btn-secondary btn-sm">
-              <CreditCard className="w-3.5 h-3.5" /> رابط دفع
-            </button>
+            {/* Online payment link temporarily hidden */}
           </div>
         </div>
       </div>
