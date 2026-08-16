@@ -10,6 +10,22 @@ from ..deps import DB, StudioId
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
+def _revenue(db, studio_id, start_dt, end_dt=None) -> float:
+    """Total revenue in a window = subscriptions (created_at) + manual payments (paid_at)."""
+    sub_q = select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
+        models.Subscription.studio_id == studio_id,
+        models.Subscription.created_at >= start_dt,
+    )
+    man_q = select(func.coalesce(func.sum(models.ManualPayment.amount), 0)).where(
+        models.ManualPayment.studio_id == studio_id,
+        models.ManualPayment.paid_at >= start_dt.date(),
+    )
+    if end_dt is not None:
+        sub_q = sub_q.where(models.Subscription.created_at < end_dt)
+        man_q = man_q.where(models.ManualPayment.paid_at < end_dt.date())
+    return float(db.scalar(sub_q) or 0) + float(db.scalar(man_q) or 0)
+
+
 @router.get("/dashboard")
 def dashboard(db: DB, studio_id: StudioId):
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -49,20 +65,9 @@ def dashboard(db: DB, studio_id: StudioId):
         )
     ) or 0
 
-    # Monthly revenue
-    monthly_revenue = db.scalar(
-        select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
-            models.Subscription.studio_id == studio_id,
-            models.Subscription.created_at >= month_start,
-        )
-    ) or 0
-    prev_month_revenue = db.scalar(
-        select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
-            models.Subscription.studio_id == studio_id,
-            models.Subscription.created_at >= prev_month_start,
-            models.Subscription.created_at < month_start,
-        )
-    ) or 0
+    # Monthly revenue = subscriptions + manual payments
+    monthly_revenue = _revenue(db, studio_id, month_start)
+    prev_month_revenue = _revenue(db, studio_id, prev_month_start, month_start)
     rev_delta = 0
     if prev_month_revenue:
         rev_delta = round(((monthly_revenue - prev_month_revenue) / prev_month_revenue) * 100, 1)
@@ -154,12 +159,7 @@ def overview(db: DB, studio_id: StudioId, period: str = Query("30d", alias="rang
     now = datetime.utcnow()
     start = now - timedelta(days=days)
 
-    total_revenue = db.scalar(
-        select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
-            models.Subscription.studio_id == studio_id,
-            models.Subscription.created_at >= start,
-        )
-    ) or 0
+    total_revenue = _revenue(db, studio_id, start)
 
     completed = db.scalar(
         select(func.count(models.Booking.id)).where(
@@ -194,13 +194,7 @@ def overview(db: DB, studio_id: StudioId, period: str = Query("30d", alias="rang
 
     # ---- Previous period (for real deltas) ----
     prev_start = start - timedelta(days=days)
-    prev_revenue = db.scalar(
-        select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
-            models.Subscription.studio_id == studio_id,
-            models.Subscription.created_at >= prev_start,
-            models.Subscription.created_at < start,
-        )
-    ) or 0
+    prev_revenue = _revenue(db, studio_id, prev_start, start)
     prev_completed = db.scalar(
         select(func.count(models.Booking.id)).where(
             models.Booking.studio_id == studio_id,
@@ -243,14 +237,8 @@ def overview(db: DB, studio_id: StudioId, period: str = Query("30d", alias="rang
     for i in range(5, -1, -1):
         ms = (now.replace(day=1) - timedelta(days=30 * i)).replace(day=1)
         me = (ms + timedelta(days=32)).replace(day=1)
-        v = db.scalar(
-            select(func.coalesce(func.sum(models.Subscription.price_paid), 0)).where(
-                models.Subscription.studio_id == studio_id,
-                models.Subscription.created_at >= ms,
-                models.Subscription.created_at < me,
-            )
-        ) or 0
-        revenue_6.append({"month": months_ar[ms.month - 1], "value": float(v)})
+        v = _revenue(db, studio_id, ms, me)
+        revenue_6.append({"month": months_ar[ms.month - 1], "value": v})
 
     # Package distribution
     pkgs = db.execute(
