@@ -6,10 +6,11 @@ totals and the automatic end-of-month summary.
 """
 import os
 import uuid
+from io import BytesIO, StringIO
 from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select, func
 
 from .. import models, schemas
@@ -161,6 +162,79 @@ def manual_payment_summary(db: DB, studio_id: StudioId, month: str | None = Quer
     total = sum(by_kind.values())
     count = sum(c for _, _, c in rows)
     return {"month": label, "total": total, "count": count, "by_kind": by_kind}
+
+
+@router.get("/export")
+def export_manual_payments(db: DB, studio_id: StudioId, month: str | None = Query(None), format: str = Query("xlsx")):
+    """Monthly statement as a real .xlsx (default) or CSV. Follows the month filter."""
+    start, end, label = _month_bounds(month)
+    rows = db.scalars(
+        select(models.ManualPayment)
+        .where(
+            models.ManualPayment.studio_id == studio_id,
+            models.ManualPayment.paid_at >= start,
+            models.ManualPayment.paid_at < end,
+        )
+        .order_by(models.ManualPayment.paid_at.asc(), models.ManualPayment.id.asc())
+    ).all()
+    studio = db.get(models.Studio, studio_id)
+    studio_name = (studio.name_ar or studio.name_en) if studio else "الاستوديو"
+    total = sum(r.amount for r in rows)
+    headers = ["التاريخ", "العميل", "النوع", "المبلغ (ر.س)", "الطريقة", "ملاحظة"]
+
+    if format == "csv":
+        buf = StringIO()
+        buf.write("﻿")  # UTF-8 BOM so Excel shows Arabic correctly
+        import csv
+        w = csv.writer(buf)
+        w.writerow(headers)
+        for r in rows:
+            w.writerow([r.paid_at.isoformat(), r.client_name, r.kind, f"{r.amount:.2f}", r.method or "", r.note or ""])
+        w.writerow([])
+        w.writerow(["الإجمالي", "", "", f"{total:.2f}", "", ""])
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="payments-{label}.csv"'},
+        )
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"كشف {label}"
+    ws.sheet_view.rightToLeft = True
+    ws.append([studio_name])
+    ws.append([f"كشف مدفوعات شهر {label}"])
+    ws.append([])
+    ws.append(headers)
+    hdr = ws.max_row
+    for r in rows:
+        ws.append([r.paid_at.isoformat(), r.client_name, r.kind, round(r.amount, 2), r.method or "", r.note or ""])
+    ws.append([])
+    ws.append(["الإجمالي", "", "", round(total, 2), "", ""])
+    total_row = ws.max_row
+
+    ws["A1"].font = Font(bold=True, size=14, color="0D4F4E")
+    ws["A2"].font = Font(bold=True, size=11, color="4B5563")
+    for cell in ws[hdr]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="0D4F4E")
+        cell.alignment = Alignment(horizontal="center")
+    for cell in ws[total_row]:
+        cell.font = Font(bold=True)
+    for i, wd in enumerate([14, 26, 16, 16, 16, 30], start=1):
+        ws.column_dimensions[chr(64 + i)].width = wd
+
+    bio = BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return Response(
+        content=bio.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="payments-{label}.xlsx"'},
+    )
 
 
 @router.get("/{payment_id}/attachment")

@@ -13,3 +13,4 @@ qrcode[pil]>=8.0
 python-dateutil>=2.9.0
 psycopg2-binary>=2.9.10
 requests>=2.32.0
+openpyxl>=3.1.5
