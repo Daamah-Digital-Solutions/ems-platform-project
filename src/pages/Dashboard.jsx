@@ -422,17 +422,6 @@ export default function Dashboard() {
           deltaTone="success"
           icon={Users}
           tint="bg-indigo-50 text-indigo-600"
-          chart={
-            <div className="mt-4">
-              <div className="flex justify-between text-[10px] text-ink-tertiary mb-1 font-bold tabular">
-                <span>{toArabicDigits(activeClients)} / ٥٠٠</span>
-                <span>{toArabicDigits(Math.round((activeClients / 500) * 100))}٪</span>
-              </div>
-              <div className="h-1.5 bg-bg rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-l from-indigo-500 to-indigo-400 rounded-full" style={{ width: `${Math.min(100, (activeClients / 500) * 100)}%` }} />
-              </div>
-            </div>
-          }
         />
         <KPI
           label="الإيراد الشهري"
@@ -446,24 +435,14 @@ export default function Dashboard() {
           deltaTone={monthlyDelta >= 0 ? 'success' : 'danger'}
           icon={DollarSign}
           tint="bg-emerald-50 text-emerald-600"
-          chart={
-            <div className="mt-3">
-              <Sparkline data={[41, 47, 52, 55, 58, Math.max(58, Math.round(monthlyRevenue / 1000))]} color="#10B981" accent="#10B981" />
-            </div>
-          }
         />
         <KPI
           label="معدل الـ No-show"
           value={`${toArabicDigits(noShowRate)}٪`}
-          delta={`${toArabicDigits(noShowDelta)}٪`}
-          deltaTone="success"
+          delta={`${noShowDelta > 0 ? '+' : ''}${toArabicDigits(noShowDelta)}٪`}
+          deltaTone={noShowDelta <= 0 ? 'success' : 'danger'}
           icon={TrendingDown}
           tint="bg-rose-50 text-rose-600"
-          chart={
-            <div className="mt-3">
-              <Sparkline data={[14, 12, 11, 13, 10, 9, 10, noShowRate || 8]} color="#EF4444" accent="#10B981" />
-            </div>
-          }
         />
       </div>
 

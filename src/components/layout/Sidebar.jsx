@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { ChevronLeft, Sparkles } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import Logo from '../Logo.jsx'
 import { NAV_ITEMS } from '../../lib/nav.js'
 import { getStoredStudio } from '../../lib/api.js'
@@ -67,26 +67,6 @@ export default function Sidebar() {
           ))}
         </ul>
       </nav>
-
-      {/* Upgrade card */}
-      <div className="m-3 p-4 rounded-2xl bg-brand-gradient text-white relative overflow-hidden">
-        <div className="absolute -top-8 -right-8 w-24 h-24 bg-accent/30 rounded-full blur-2xl" />
-        <div className="relative">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span className="text-[10px] font-extrabold uppercase tracking-wider">باقتك</span>
-          </div>
-          <div className="font-extrabold mb-0.5">الباقة الاحترافية</div>
-          <div className="text-[11px] text-white/80 mb-3">١٤٧ من ٥٠٠ عميل</div>
-          <div className="h-1.5 bg-white/15 rounded-full overflow-hidden mb-3">
-            <div className="h-full bg-accent rounded-full" style={{ width: '29%' }} />
-          </div>
-          <button className="text-xs font-extrabold text-white/95 hover:text-white inline-flex items-center gap-1">
-            ترقية الباقة
-            <ChevronLeft className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
     </aside>
   )
 }

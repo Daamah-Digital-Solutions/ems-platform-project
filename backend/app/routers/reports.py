@@ -89,6 +89,26 @@ def dashboard(db: DB, studio_id: StudioId):
         )
     ) or 0
     no_show_rate = round((noshow_30 / total_30) * 100, 1) if total_30 else 0
+    # Previous 30 days (for a real delta)
+    prev_30_start = today - timedelta(days=60)
+    prev_total_30 = db.scalar(
+        select(func.count(models.Booking.id)).where(
+            models.Booking.studio_id == studio_id,
+            models.Booking.start_time >= prev_30_start,
+            models.Booking.start_time < last_30,
+            models.Booking.status.in_(["مكتمل", "لم يحضر"]),
+        )
+    ) or 0
+    prev_noshow_30 = db.scalar(
+        select(func.count(models.Booking.id)).where(
+            models.Booking.studio_id == studio_id,
+            models.Booking.start_time >= prev_30_start,
+            models.Booking.start_time < last_30,
+            models.Booking.status == "لم يحضر",
+        )
+    ) or 0
+    prev_no_show_rate = round((prev_noshow_30 / prev_total_30) * 100, 1) if prev_total_30 else 0
+    no_show_delta = round(no_show_rate - prev_no_show_rate, 1)
 
     # Last 7 days bookings
     last_7 = []
@@ -146,7 +166,7 @@ def dashboard(db: DB, studio_id: StudioId):
         "monthly_revenue": float(monthly_revenue),
         "monthly_revenue_delta": rev_delta,
         "no_show_rate": no_show_rate,
-        "no_show_delta": -2,  # static for now
+        "no_show_delta": no_show_delta,
         "last_7_days": last_7,
         "alerts": alerts,
         "top_performers": top_performers,
