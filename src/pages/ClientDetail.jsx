@@ -18,19 +18,24 @@ import {
   Download,
   Snowflake,
   Star,
-  CreditCard
+  CreditCard,
+  Receipt,
+  Eye,
+  Trash2
 } from 'lucide-react'
-import { clientsApi } from '../lib/api.js'
+import { clientsApi, manualPaymentsApi, fetchBlob } from '../lib/api.js'
 import { useApi } from '../lib/useApi.js'
 import { cn, toArabicDigits, initials, avatarColor, formatNumberAr, waLink, telLink } from '../lib/utils.js'
 import ClientFormModal from '../components/ClientFormModal.jsx'
 import PaymentLinkModal from '../components/PaymentLinkModal.jsx'
+import ManualPaymentModal from '../components/ManualPaymentModal.jsx'
 import { toast, comingSoon } from '../lib/toast.js'
 
 const TABS = [
   { k: 'overview', label: 'نظرة عامة' },
   { k: 'parq', label: 'PAR-Q' },
   { k: 'packages', label: 'الباقات' },
+  { k: 'payments', label: 'المدفوعات' },
   { k: 'bookings', label: 'الحجوزات' },
   { k: 'docs', label: 'الملفات' },
   { k: 'notes', label: 'الملاحظات' }
@@ -112,6 +117,8 @@ export default function ClientDetail() {
   const [tab, setTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
+  const [recordOpen, setRecordOpen] = useState(false)
+  const [payRefresh, setPayRefresh] = useState(0)
 
   if (loading && !client) {
     return (
@@ -200,6 +207,9 @@ export default function ClientDetail() {
             <button onClick={() => navigate(`/bookings/new?client=${c.id}`)} className="btn-primary btn-sm">
               <Plus className="w-3.5 h-3.5" /> حجز جديد
             </button>
+            <button onClick={() => setRecordOpen(true)} className="btn bg-emerald-600 text-white hover:bg-emerald-700 btn-sm">
+              <Receipt className="w-3.5 h-3.5" /> تسجيل دفعة
+            </button>
             <button onClick={() => setPayOpen(true)} className="btn-secondary btn-sm">
               <CreditCard className="w-3.5 h-3.5" /> رابط دفع
             </button>
@@ -226,6 +236,7 @@ export default function ClientDetail() {
           {tab === 'overview' && <OverviewTab c={c} />}
           {tab === 'parq' && <ParqTab c={c} />}
           {tab === 'packages' && <PackagesTab c={c} />}
+          {tab === 'payments' && <PaymentsTab clientId={Number(id)} refreshKey={payRefresh} onRecord={() => setRecordOpen(true)} />}
           {tab === 'bookings' && <BookingsTab c={c} clientId={Number(id)} />}
           {tab === 'docs' && <DocsTab />}
           {tab === 'notes' && <NotesTab clientId={Number(id)} />}
@@ -244,6 +255,104 @@ export default function ClientDetail() {
         fixedClient={client}
         onClose={() => setPayOpen(false)}
       />
+
+      <ManualPaymentModal
+        open={recordOpen}
+        fixedClient={client}
+        onClose={() => setRecordOpen(false)}
+        onSaved={() => { setRecordOpen(false); setPayRefresh((k) => k + 1); setTab('payments') }}
+      />
+    </div>
+  )
+}
+
+function PaymentsTab({ clientId, refreshKey, onRecord }) {
+  const { data: payments = [], reload } = useApi(() => manualPaymentsApi.list({ client_id: clientId }), [clientId, refreshKey])
+  const list = payments || []
+  const total = list.reduce((s, p) => s + p.amount, 0)
+  const KIND = { 'اشتراك': 'bg-brand-50 text-brand', 'جلسة تجريبية': 'bg-amber-50 text-amber-700', 'أخرى': 'bg-gray-100 text-gray-600' }
+  const fmtDate = (iso) => { if (!iso) return '—'; const [y, m, d] = iso.split('-'); return `${toArabicDigits(d)}/${toArabicDigits(m)}/${toArabicDigits(y)}` }
+
+  async function viewInvoice(p) {
+    try { const b = await fetchBlob(`/api/manual-payments/${p.id}/attachment`); window.open(URL.createObjectURL(b), '_blank') }
+    catch (e) { toast(e.message || 'تعذّر فتح الفاتورة', 'error') }
+  }
+  async function del(p) {
+    if (!window.confirm(`حذف دفعة بمبلغ ${formatNumberAr(p.amount)} ر.س؟`)) return
+    try { await manualPaymentsApi.remove(p.id); toast('تم حذف الدفعة', 'success'); reload() }
+    catch (e) { toast(e.message || 'تعذّر الحذف', 'error') }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="card p-4">
+            <div className="text-2xl font-extrabold tabular text-emerald-600">{formatNumberAr(total.toFixed(0))}</div>
+            <div className="text-[10px] text-ink-tertiary font-bold mt-0.5">إجمالي المدفوع (ر.س)</div>
+          </div>
+          <div className="card p-4">
+            <div className="text-2xl font-extrabold tabular text-brand">{toArabicDigits(list.length)}</div>
+            <div className="text-[10px] text-ink-tertiary font-bold mt-0.5">عدد الدفعات</div>
+          </div>
+        </div>
+        <button onClick={onRecord} className="btn-primary btn-sm">
+          <Plus className="w-3.5 h-3.5" /> تسجيل دفعة
+        </button>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="card p-10 text-center">
+          <span className="w-12 h-12 mx-auto rounded-xl bg-brand-50 text-brand flex items-center justify-center mb-3">
+            <Receipt className="w-6 h-6" />
+          </span>
+          <p className="font-extrabold text-ink-primary">لا توجد مدفوعات لهذا العميل بعد</p>
+          <button onClick={onRecord} className="btn-primary btn-sm mt-4">
+            <Plus className="w-3.5 h-3.5" /> تسجيل دفعة
+          </button>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-bg/60 text-[10px] font-extrabold uppercase tracking-wider text-ink-tertiary">
+                <tr>
+                  <th className="text-right px-5 py-3">التاريخ</th>
+                  <th className="text-right px-3 py-3">النوع</th>
+                  <th className="text-right px-3 py-3">المبلغ</th>
+                  <th className="text-right px-3 py-3 hidden sm:table-cell">الطريقة</th>
+                  <th className="text-right px-3 py-3">الفاتورة</th>
+                  <th className="text-right px-5 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {list.map((p) => (
+                  <tr key={p.id} className="hover:bg-bg/40">
+                    <td className="px-5 py-3 tabular text-ink-secondary">{fmtDate(p.paid_at)}</td>
+                    <td className="px-3 py-3">
+                      <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-extrabold', KIND[p.kind] || KIND['أخرى'])}>{p.kind}</span>
+                    </td>
+                    <td className="px-3 py-3 font-extrabold tabular">{formatNumberAr(p.amount)} ر.س</td>
+                    <td className="px-3 py-3 text-ink-secondary hidden sm:table-cell">{p.method || '—'}</td>
+                    <td className="px-3 py-3">
+                      {p.has_attachment ? (
+                        <button onClick={() => viewInvoice(p)} className="inline-flex items-center gap-1 text-brand font-bold hover:text-brand-light text-xs">
+                          <Eye className="w-3.5 h-3.5" /> عرض
+                        </button>
+                      ) : <span className="text-ink-tertiary text-xs">—</span>}
+                    </td>
+                    <td className="px-5 py-3 text-left">
+                      <button onClick={() => del(p)} title="حذف" className="w-8 h-8 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
