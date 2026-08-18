@@ -26,6 +26,41 @@ def _revenue(db, studio_id, start_dt, end_dt=None) -> float:
     return float(db.scalar(sub_q) or 0) + float(db.scalar(man_q) or 0)
 
 
+def _completed_by_trainer(db, studio_id, start_dt, end_dt=None) -> dict:
+    """Completed ("مكتمل") sessions per trainer in a window.
+
+    Returns {trainer_id: {"total": n, "subscription": n}}. Trial count = total - subscription
+    (a booking with a subscription_id is a paid-package session; without one it's a trial/one-off).
+    """
+    q = select(
+        models.Booking.trainer_id,
+        func.count(models.Booking.id),
+        func.count(models.Booking.subscription_id),  # counts non-NULL subscription_id
+    ).where(
+        models.Booking.studio_id == studio_id,
+        models.Booking.status == "مكتمل",
+        models.Booking.start_time >= start_dt,
+    )
+    if end_dt is not None:
+        q = q.where(models.Booking.start_time < end_dt)
+    q = q.group_by(models.Booking.trainer_id)
+    return {r[0]: {"total": int(r[1] or 0), "subscription": int(r[2] or 0)} for r in db.execute(q).all()}
+
+
+def _month_bounds(month: str | None):
+    """Return (start, end, 'YYYY-MM') for a 'YYYY-MM' string, defaulting to the current month."""
+    now = datetime.utcnow()
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if month:
+        try:
+            y, m = month.split("-")
+            start = datetime(int(y), int(m), 1)
+        except (ValueError, TypeError):
+            pass
+    end = (start + timedelta(days=32)).replace(day=1)
+    return start, end, start.strftime("%Y-%m")
+
+
 @router.get("/dashboard")
 def dashboard(db: DB, studio_id: StudioId):
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -149,14 +184,16 @@ def dashboard(db: DB, studio_id: StudioId):
             "text": f"{high_wash_suits} بدلات تحتاج صيانة (٥٠+ غسلة)", "cta": "إدارة"
         })
 
-    # Top performers (this month)
-    top = db.execute(
-        select(models.Trainer.id, models.Trainer.name_ar, models.Trainer.initials, models.Trainer.month_sessions)
+    # Top performers (this month) — real completed sessions from bookings
+    month_counts = _completed_by_trainer(db, studio_id, month_start)
+    trs = db.execute(
+        select(models.Trainer.id, models.Trainer.name_ar, models.Trainer.initials)
         .where(models.Trainer.studio_id == studio_id, models.Trainer.is_active == True)
-        .order_by(models.Trainer.month_sessions.desc())
-        .limit(3)
     ).all()
-    top_performers = [{"name": t[1], "initials": t[2] or "", "sessions": t[3] or 0} for t in top]
+    top_performers = sorted(
+        [{"name": t[1], "initials": t[2] or "", "sessions": month_counts.get(t[0], {}).get("total", 0)} for t in trs],
+        key=lambda x: x["sessions"], reverse=True,
+    )[:3]
 
     return {
         "bookings_today": bookings_today,
@@ -298,14 +335,16 @@ def overview(db: DB, studio_id: StudioId, period: str = Query("30d", alias="rang
         rate = round((ns / total) * 100) if total else 0
         no_show_weekly.append({"week": f"أ{9 - i}", "value": rate})
 
-    # Trainer performance
+    # Trainer performance — real completed sessions in the selected period
+    period_counts = _completed_by_trainer(db, studio_id, start)
     perf_rows = db.execute(
-        select(models.Trainer.name_ar, models.Trainer.month_sessions)
+        select(models.Trainer.id, models.Trainer.name_ar)
         .where(models.Trainer.studio_id == studio_id, models.Trainer.is_active == True)
-        .order_by(models.Trainer.month_sessions.desc())
-        .limit(5)
     ).all()
-    trainer_performance = [{"name": r[0], "sessions": r[1] or 0} for r in perf_rows]
+    trainer_performance = sorted(
+        [{"name": r[1], "sessions": period_counts.get(r[0], {}).get("total", 0)} for r in perf_rows],
+        key=lambda x: x["sessions"], reverse=True,
+    )[:5]
 
     # Funnel (static-ish based on counts)
     leads = (db.scalar(select(func.count(models.Client.id)).where(models.Client.studio_id == studio_id)) or 0) * 3
@@ -362,4 +401,62 @@ def overview(db: DB, studio_id: StudioId, period: str = Query("30d", alias="rang
         "trainer_performance": trainer_performance,
         "funnel": funnel,
         "peak_heatmap": peak_heatmap,
+    }
+
+
+@router.get("/trainer-sessions")
+def trainer_sessions(db: DB, studio_id: StudioId, month: str | None = Query(None, description="YYYY-MM")):
+    """Completed sessions per trainer for a given month (default: current month).
+
+    Each trainer's total = completed bookings assigned to them that month, split into
+    subscription sessions and trial sessions. Powers the monthly per-trainer report.
+    """
+    start, end, label = _month_bounds(month)
+    counts = _completed_by_trainer(db, studio_id, start, end)
+
+    trainers = db.scalars(
+        select(models.Trainer)
+        .where(models.Trainer.studio_id == studio_id, models.Trainer.is_active == True)
+    ).all()
+    active_ids = {t.id for t in trainers}
+
+    rows = []
+    for t in trainers:
+        c = counts.get(t.id, {"total": 0, "subscription": 0})
+        total = c["total"]
+        sub = c["subscription"]
+        rows.append({
+            "trainer_id": t.id,
+            "name_ar": t.name_ar,
+            "initials": t.initials or (t.name_ar or "")[:2],
+            "specialty": t.specialty,
+            "completed": total,
+            "subscription": sub,
+            "trial": total - sub,
+        })
+
+    # Include sessions logged under trainers that were since deactivated/deleted, so totals reconcile.
+    for tid, c in counts.items():
+        if tid in active_ids:
+            continue
+        t = db.get(models.Trainer, tid)
+        total = c["total"]
+        sub = c["subscription"]
+        rows.append({
+            "trainer_id": tid,
+            "name_ar": (t.name_ar if t else "مدرب سابق"),
+            "initials": ((t.initials if t else None) or "؟"),
+            "specialty": (t.specialty if t else None),
+            "completed": total,
+            "subscription": sub,
+            "trial": total - sub,
+        })
+
+    rows.sort(key=lambda r: r["completed"], reverse=True)
+    return {
+        "month": label,
+        "total": sum(r["completed"] for r in rows),
+        "total_subscription": sum(r["subscription"] for r in rows),
+        "total_trial": sum(r["trial"] for r in rows),
+        "trainers": rows,
     }

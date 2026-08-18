@@ -149,7 +149,8 @@ export const bookingsApi = {
 // ============ Reports ============
 export const reportsApi = {
   dashboard: () => request('/api/reports/dashboard'),
-  overview: (range) => request('/api/reports/overview', { params: { range } })
+  overview: (range) => request('/api/reports/overview', { params: { range } }),
+  trainerSessions: (month) => request('/api/reports/trainer-sessions', { params: { month } })
 }
 
 // ============ Invoices ============
