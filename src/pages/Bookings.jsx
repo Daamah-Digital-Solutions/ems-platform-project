@@ -24,6 +24,9 @@ function statusColor(status) {
   }
 }
 
+// A booking still awaiting an outcome (can be quick-marked "تم")
+const isPending = (s) => s === 'مؤكد' || s === 'جاري'
+
 const HOURS = Array.from({ length: 18 }, (_, i) => 6 + i) // 6am - 11pm
 const PRAYER_HOURS = { 12: 'الظهر', 15: 'العصر', 18: 'المغرب', 19: 'العشاء' }
 const DAY_NAMES = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -75,6 +78,21 @@ export default function Bookings() {
     done: list.filter((b) => b.status === 'مكتمل').length,
     upcoming: list.filter((b) => b.status === 'مؤكد' || b.status === 'جاري').length,
     noshow: list.filter((b) => b.status === 'لم يحضر').length,
+  }
+
+  // One-click "تم": mark a booking completed straight from its card (no modal).
+  const [doneId, setDoneId] = useState(null)
+  async function quickDone(b) {
+    setDoneId(b.id)
+    try {
+      await bookingsApi.update(b.id, { status: 'مكتمل' })
+      toast(`تم ✓ — جلسة ${b.client_name} مكتملة`, 'success')
+      reload()
+    } catch (e) {
+      toast(e.message || 'تعذّر التحديث', 'error')
+    } finally {
+      setDoneId(null)
+    }
   }
 
   const step = view === 'month' ? null : view === 'week' ? 7 : 1
@@ -148,8 +166,8 @@ export default function Bookings() {
 
       {loading && <div className="card p-12 text-center text-ink-tertiary font-bold">جاري التحميل...</div>}
 
-      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} dateISO={ymd(current)} onSelect={setSelected} />}
-      {!loading && view === 'week' && <WeekView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} onSelect={setSelected} />}
+      {!loading && view === 'day' && <DayView bookings={list} machines={machinesList} dateISO={ymd(current)} onSelect={setSelected} onQuickDone={quickDone} doneId={doneId} />}
+      {!loading && view === 'week' && <WeekView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} onSelect={setSelected} onQuickDone={quickDone} doneId={doneId} />}
       {!loading && view === 'month' && <MonthView bookings={list} current={current} onPickDay={(d) => { setCurrent(d); setView('day') }} />}
 
       <BookingDetailModal booking={selected} onClose={() => setSelected(null)} onChanged={reload} />
@@ -173,7 +191,7 @@ export default function Bookings() {
   )
 }
 
-function DayView({ bookings, machines, dateISO, onSelect }) {
+function DayView({ bookings, machines, dateISO, onSelect, onQuickDone, doneId }) {
   const cols = machines.length || 1
   const gridCols = `80px repeat(${cols}, minmax(120px, 1fr))`
 
@@ -224,14 +242,26 @@ function DayView({ bookings, machines, dateISO, onSelect }) {
                           {cell.map((b) => {
                             const s = statusColor(b.status)
                             return (
-                              <button key={b.id} onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-2 border transition-transform hover:-translate-y-0.5 hover:shadow-card', s.bg, s.text)}>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <span className={cn('w-1.5 h-1.5 rounded-full', s.dot)} />
-                                  <span className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</span>
-                                </div>
-                                <div className="font-extrabold text-xs truncate">{b.client_name}</div>
-                                <div className="text-[10px] opacity-75 truncate">{b.trainer_name}</div>
-                              </button>
+                              <div key={b.id} className="relative">
+                                <button onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-2 border transition-transform hover:-translate-y-0.5 hover:shadow-card', s.bg, s.text)}>
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className={cn('w-1.5 h-1.5 rounded-full', s.dot)} />
+                                    <span className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</span>
+                                  </div>
+                                  <div className="font-extrabold text-xs truncate pl-9">{b.client_name}</div>
+                                  <div className="text-[10px] opacity-75 truncate">{b.trainer_name}</div>
+                                </button>
+                                {isPending(b.status) && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); onQuickDone?.(b) }}
+                                    disabled={doneId === b.id}
+                                    title="تم — تعليم الجلسة كمكتملة"
+                                    className="absolute top-1.5 left-1.5 inline-flex items-center gap-0.5 px-1.5 h-6 rounded-md bg-emerald-500 text-white text-[10px] font-extrabold shadow-sm hover:bg-emerald-600 active:scale-95 transition disabled:opacity-50"
+                                  >
+                                    {doneId === b.id ? '...' : <><Check className="w-3 h-3" /> تم</>}
+                                  </button>
+                                )}
+                              </div>
                             )
                           })}
                         </div>
@@ -257,7 +287,7 @@ function DayView({ bookings, machines, dateISO, onSelect }) {
   )
 }
 
-function WeekView({ bookings, current, onPickDay, onSelect }) {
+function WeekView({ bookings, current, onPickDay, onSelect, onQuickDone, doneId }) {
   const weekStart = startOfWeek(current)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   return (
@@ -283,10 +313,22 @@ function WeekView({ bookings, current, onPickDay, onSelect }) {
                 {dayBookings.map((b) => {
                   const s = statusColor(b.status)
                   return (
-                    <button key={b.id} onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-1.5 border hover:shadow-card', s.bg, s.text)}>
-                      <div className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</div>
-                      <div className="font-extrabold text-[11px] truncate">{b.client_name}</div>
-                    </button>
+                    <div key={b.id} className="relative">
+                      <button onClick={() => onSelect?.(b)} className={cn('w-full text-right rounded-lg p-1.5 border hover:shadow-card', s.bg, s.text)}>
+                        <div className="text-[9px] font-extrabold opacity-80 tabular">{fmtTime(b._d)}</div>
+                        <div className="font-extrabold text-[11px] truncate pl-7">{b.client_name}</div>
+                      </button>
+                      {isPending(b.status) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onQuickDone?.(b) }}
+                          disabled={doneId === b.id}
+                          title="تم — تعليم الجلسة كمكتملة"
+                          className="absolute top-1 left-1 inline-flex items-center px-1 h-5 rounded bg-emerald-500 text-white text-[9px] font-extrabold shadow-sm hover:bg-emerald-600 active:scale-95 transition disabled:opacity-50"
+                        >
+                          {doneId === b.id ? '...' : <><Check className="w-2.5 h-2.5" /> تم</>}
+                        </button>
+                      )}
+                    </div>
                   )
                 })}
               </div>
